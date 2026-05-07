@@ -2,8 +2,8 @@ export interface AttestationExpectations {
   nonce: string;
   arch: string;
   deviceCertHash: string;
-  rimHash: string;
-  ueid: string;
+  rimHash?: string;
+  ueid?: string;
   measurements: string[];
 }
 

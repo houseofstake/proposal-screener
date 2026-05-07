@@ -24,6 +24,7 @@ vi.mock("ethers", () => ({
 }));
 
 const fetchMock = vi.fn();
+type VerificationProofProps = React.ComponentProps<typeof VerificationProof>;
 
 describe("VerificationProof component", () => {
   beforeEach(() => {
@@ -37,6 +38,9 @@ describe("VerificationProof component", () => {
       configurable: true,
     });
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob://mock");
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      () => undefined
+    );
   });
 
   afterEach(() => {
@@ -47,22 +51,20 @@ describe("VerificationProof component", () => {
     delete navigator.clipboard;
   });
 
-  const renderComponent = (props: Partial<React.ComponentProps<typeof VerificationProof>> = {}) =>
-    render(
-      <VerificationProof
-        verificationId="id1"
-        model="m"
-        requestHash="req"
-        responseHash="res"
-        nonce={mockNonce}
-        expectedArch="HOPPER"
-        expectedDeviceCertHash="hash"
-        expectedRimHash="rim"
-        expectedUeid="ueid"
-        expectedMeasurements={["m1"]}
-        {...props}
-      />
-    );
+  const renderComponent = (props: Partial<VerificationProofProps> = {}) =>
+    render(React.createElement(VerificationProof, {
+      verificationId: "id1",
+      model: "m",
+      requestHash: "req",
+      responseHash: "res",
+      nonce: mockNonce,
+      expectedArch: "HOPPER",
+      expectedDeviceCertHash: "hash",
+      expectedRimHash: "rim",
+      expectedUeid: "ueid",
+      expectedMeasurements: ["m1"],
+      ...props,
+    }));
 
   it("renders verified badge and steps when proof passes", async () => {
     renderComponent();
@@ -76,14 +78,12 @@ describe("VerificationProof component", () => {
   });
 
   it("shows expectations missing alert and skips fetch when expectations absent", async () => {
-    render(
-      <VerificationProof
-        verificationId="id1"
-        model="m"
-        requestHash="req"
-        responseHash="res"
-      />
-    );
+    render(React.createElement(VerificationProof, {
+      verificationId: "id1",
+      model: "m",
+      requestHash: "req",
+      responseHash: "res",
+    }));
     await act(async () => fireEvent.click(screen.getByRole("button")));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(
@@ -235,19 +235,17 @@ describe("VerificationProof component", () => {
   });
 
   it("shows No Verification ID alert when verification ID missing", async () => {
-    render(
-      <VerificationProof
-        model="m"
-        requestHash="req"
-        responseHash="res"
-        nonce={mockNonce}
-        expectedArch="HOPPER"
-        expectedDeviceCertHash="hash"
-        expectedRimHash="rim"
-        expectedUeid="ueid"
-        expectedMeasurements={["m1"]}
-      />
-    );
+    render(React.createElement(VerificationProof, {
+      model: "m",
+      requestHash: "req",
+      responseHash: "res",
+      nonce: mockNonce,
+      expectedArch: "HOPPER",
+      expectedDeviceCertHash: "hash",
+      expectedRimHash: "rim",
+      expectedUeid: "ueid",
+      expectedMeasurements: ["m1"],
+    }));
     await act(async () => fireEvent.click(screen.getByRole("button")));
     expect(screen.getByText(/No Verification ID/i)).toBeInTheDocument();
   });
@@ -265,19 +263,18 @@ describe("VerificationProof component", () => {
 
   it("renders NRAS summary and copies JWT", async () => {
     const clipboardSpy = vi.spyOn(navigator.clipboard, "writeText");
-    render(
-      <VerificationProof
-        verificationId="id1"
-        model="m"
-        requestHash="req"
-        responseHash="res"
-        nonce={mockNonce}
-        expectedArch="HOPPER"
-        expectedDeviceCertHash="hash"
-        expectedRimHash="rim"
-        expectedUeid="ueid"
-        expectedMeasurements={["m1"]}
-        prefetchedProof={{
+    render(React.createElement(VerificationProof, {
+      verificationId: "id1",
+      model: "m",
+      requestHash: "req",
+      responseHash: "res",
+      nonce: mockNonce,
+      expectedArch: "HOPPER",
+      expectedDeviceCertHash: "hash",
+      expectedRimHash: "rim",
+      expectedUeid: "ueid",
+      expectedMeasurements: ["m1"],
+      prefetchedProof: {
           attestation: {
             gateway_attestation: {
               signing_address: mockAddress,
@@ -299,9 +296,8 @@ describe("VerificationProof component", () => {
             nras: mockNonce,
             valid: true,
           },
-        }}
-      />
-    );
+        },
+    }));
     await act(async () => fireEvent.click(screen.getByRole("button")));
     expect(screen.getByText(/NVIDIA Report/i)).toBeInTheDocument();
     const copyButtons = screen.getAllByRole("button", { name: /Copy/i });

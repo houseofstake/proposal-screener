@@ -162,10 +162,10 @@ export default async function handler(
     nonce: expectedNonce,
     expectedArch,
     expectedDeviceCertHash,
-  expectedRimHash,
-  expectedUeid,
-  expectedMeasurements,
-} = (req.body ?? {}) as Partial<NrasVerificationRequest>;
+    expectedRimHash,
+    expectedUeid,
+    expectedMeasurements,
+  } = (req.body ?? {}) as Partial<NrasVerificationRequest>;
 
   const expectationsMissing =
     !expectedArch ||
@@ -178,7 +178,7 @@ export default async function handler(
   if (process.env.VERIFY_USE_MOCKS === "true") {
     const verified = !expectationsMissing && !!expectedNonce;
     const reasons = expectationsMissing
-      ? ["Expectations missing: arch/device_cert_hash/rim/ueid/measurements"]
+      ? ["Expectations missing: arch/device_cert_hash/measurements"]
       : [];
     return res.status(200).json({
       verified,
@@ -204,7 +204,7 @@ export default async function handler(
   if (expectationsMissing) {
     return res.status(400).json({
       error:
-        "Expected arch/device_cert_hash/rim/ueid/measurements are required for verification",
+        "Expected arch/device_cert_hash/measurements are required for verification",
     });
   }
 

@@ -12,6 +12,7 @@ describe("deriveVerificationState nonce handling", () => {
 
   it("marks nonce missing as error and overall failed", () => {
     const state = deriveVerificationState({
+      proof: {},
       attestationResult: "Pass",
       nrasVerified: true,
       intelVerified: true,

@@ -2,7 +2,7 @@
 
 import { db } from "../src/lib/db";
 import { screeningResults } from "../src/lib/db/schema";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Evaluation } from "../src/types/evaluation";
 
 const colors = {
@@ -21,9 +21,12 @@ const log = {
   warn: (msg: string) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
 };
 
-// Test data with new evaluation structure
-const testTopicId = "test-topic-12345";
-const testRevisionNumber = 1;
+const testAccount = "test.near";
+const testProposalContent =
+  "Test proposal content for validating the current screening_results schema.";
+const insertedSubmissionIds: string[] = [];
+let firstSubmissionId: string | null = null;
+
 const testEvaluation: Evaluation = {
   // Quality criteria
   complete: { pass: true, reason: "Test complete" },
@@ -67,17 +70,23 @@ async function testConnection() {
 }
 
 async function testInsert() {
-  log.info("Testing INSERT operation (revision 1)...");
+  log.info("Testing INSERT operation...");
   try {
-    await db.insert(screeningResults).values({
-      topicId: testTopicId,
-      revisionNumber: testRevisionNumber,
-      evaluation: testEvaluation,
-      title: "Test Proposal",
-      nearAccount: "test.near",
-      qualityScore: testEvaluation.qualityScore,
-      attentionScore: testEvaluation.attentionScore,
-    });
+    const [row] = await db
+      .insert(screeningResults)
+      .values({
+        evaluation: testEvaluation,
+        title: "Test Proposal",
+        proposalContent: testProposalContent,
+        nearAccount: testAccount,
+        qualityScore: testEvaluation.qualityScore,
+        attentionScore: testEvaluation.attentionScore,
+      })
+      .returning({ submissionId: screeningResults.submissionId });
+
+    firstSubmissionId = row.submissionId;
+    insertedSubmissionIds.push(row.submissionId);
+
     log.success("Insert successful!");
     return true;
   } catch (error) {
@@ -88,16 +97,16 @@ async function testInsert() {
 
 async function testSelect() {
   log.info("Testing SELECT operation...");
+  if (!firstSubmissionId) {
+    log.error("Select failed: Insert did not return a submissionId");
+    return false;
+  }
+
   try {
     const result = await db
       .select()
       .from(screeningResults)
-      .where(
-        and(
-          eq(screeningResults.topicId, testTopicId),
-          eq(screeningResults.revisionNumber, testRevisionNumber)
-        )
-      )
+      .where(eq(screeningResults.submissionId, firstSubmissionId))
       .limit(1);
 
     if (!result || result.length === 0) {
@@ -107,8 +116,7 @@ async function testSelect() {
 
     const screening = result[0];
     log.success("Select successful!");
-    console.log(`   Topic ID: ${screening.topicId}`);
-    console.log(`   Revision: ${screening.revisionNumber}`);
+    console.log(`   Submission ID: ${screening.submissionId}`);
     console.log(`   Title: ${screening.title}`);
     console.log(`   Account: ${screening.nearAccount}`);
     console.log(`   Passed: ${screening.evaluation.overallPass}`);
@@ -122,11 +130,10 @@ async function testSelect() {
   }
 }
 
-async function testMultipleRevisions() {
-  log.info("Testing multiple revisions for same topic...");
+async function testMultipleScreenings() {
+  log.info("Testing multiple screenings for same account...");
   try {
-    // Insert revision 2 with medium scores
-    const eval2: Evaluation = {
+    const mediumEvaluation: Evaluation = {
       ...testEvaluation,
       consistent: { pass: false, reason: "Found inconsistencies" },
       relevant: { score: "medium", reason: "Moderate relevance" },
@@ -134,18 +141,7 @@ async function testMultipleRevisions() {
       attentionScore: 0.75, // high + medium = (1 + 0.5) / 2
     };
 
-    await db.insert(screeningResults).values({
-      topicId: testTopicId,
-      revisionNumber: 2,
-      evaluation: eval2,
-      title: "Test Proposal (Edited)",
-      nearAccount: "test.near",
-      qualityScore: eval2.qualityScore,
-      attentionScore: eval2.attentionScore,
-    });
-
-    // Insert revision 3 with low scores (failed)
-    const eval3: Evaluation = {
+    const lowEvaluation: Evaluation = {
       ...testEvaluation,
       complete: { pass: false, reason: "Missing budget" },
       legible: { pass: false, reason: "Unclear objectives" },
@@ -157,136 +153,53 @@ async function testMultipleRevisions() {
       overallPass: false,
     };
 
-    await db.insert(screeningResults).values({
-      topicId: testTopicId,
-      revisionNumber: 3,
-      evaluation: eval3,
-      title: "Test Proposal (Edited Again)",
-      nearAccount: "test.near",
-      qualityScore: eval3.qualityScore,
-      attentionScore: eval3.attentionScore,
-    });
+    const rows = await db
+      .insert(screeningResults)
+      .values([
+        {
+          evaluation: mediumEvaluation,
+          title: "Test Proposal (Medium Scores)",
+          proposalContent: testProposalContent,
+          nearAccount: testAccount,
+          qualityScore: mediumEvaluation.qualityScore,
+          attentionScore: mediumEvaluation.attentionScore,
+        },
+        {
+          evaluation: lowEvaluation,
+          title: "Test Proposal (Low Scores)",
+          proposalContent: testProposalContent,
+          nearAccount: testAccount,
+          qualityScore: lowEvaluation.qualityScore,
+          attentionScore: lowEvaluation.attentionScore,
+        },
+      ])
+      .returning({ submissionId: screeningResults.submissionId });
 
-    // Query all revisions
-    const allRevisions = await db
+    insertedSubmissionIds.push(...rows.map((row) => row.submissionId));
+
+    const screenings = await db
       .select()
       .from(screeningResults)
-      .where(eq(screeningResults.topicId, testTopicId))
-      .orderBy(screeningResults.revisionNumber);
+      .where(inArray(screeningResults.submissionId, insertedSubmissionIds));
 
-    if (allRevisions.length === 3) {
+    if (screenings.length === 3) {
       log.success(
-        `Multiple revisions working! Found ${allRevisions.length} revisions`
+        `Multiple screenings working! Found ${screenings.length} rows`
       );
-      console.log(
-        `   Revision 1: ${
-          allRevisions[0].evaluation.overallPass ? "Pass" : "Fail"
-        } (Q: ${allRevisions[0].qualityScore}, A: ${
-          allRevisions[0].attentionScore
-        })`
-      );
-      console.log(
-        `   Revision 2: ${
-          allRevisions[1].evaluation.overallPass ? "Pass" : "Fail"
-        } (Q: ${allRevisions[1].qualityScore}, A: ${
-          allRevisions[1].attentionScore
-        })`
-      );
-      console.log(
-        `   Revision 3: ${
-          allRevisions[2].evaluation.overallPass ? "Pass" : "Fail"
-        } (Q: ${allRevisions[2].qualityScore}, A: ${
-          allRevisions[2].attentionScore
-        })`
-      );
+      screenings.forEach((screening) => {
+        console.log(
+          `   ${screening.title}: ${
+            screening.evaluation.overallPass ? "Pass" : "Fail"
+          } (Q: ${screening.qualityScore}, A: ${screening.attentionScore})`
+        );
+      });
       return true;
-    } else {
-      log.error(`Expected 3 revisions, got ${allRevisions.length}`);
-      return false;
     }
-  } catch (error) {
-    log.error(`Multiple revisions test failed: ${error}`);
+
+    log.error(`Expected 3 screenings, got ${screenings.length}`);
     return false;
-  }
-}
-
-async function testDuplicatePrevention() {
-  log.info(
-    "Testing duplicate prevention (composite primary key constraint)..."
-  );
-  try {
-    // Try to insert the same topicId + revisionNumber again
-    await db.insert(screeningResults).values({
-      topicId: testTopicId,
-      revisionNumber: testRevisionNumber,
-      evaluation: testEvaluation,
-      title: "Duplicate Test Proposal",
-      nearAccount: "test.near",
-      qualityScore: testEvaluation.qualityScore,
-      attentionScore: testEvaluation.attentionScore,
-    });
-
-    // If we get here, the constraint didn't work
-    log.error(
-      "Duplicate prevention failed: Insert succeeded when it should have failed"
-    );
-    return false;
-  } catch (error: unknown) {
-    // Check if it's the expected error (PostgreSQL unique violation)
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
-    const errorCode =
-      typeof error === "object" && error !== null
-        ? (error as { code?: string; cause?: { code?: string } }).code ??
-          (error as { cause?: { code?: string } }).cause?.code
-        : undefined;
-
-    if (
-      errorCode === "23505" ||
-      errorMessage.includes("duplicate key") ||
-      errorMessage.includes("unique constraint") ||
-      errorMessage.includes("topic_id") ||
-      errorMessage.includes("revision_number")
-    ) {
-      log.success(
-        "Duplicate prevention working! Composite primary key constraint enforced"
-      );
-      return true;
-    } else {
-      log.error(`Unexpected error: ${errorMessage}`);
-      return false;
-    }
-  }
-}
-
-async function testLatestRevisionQuery() {
-  log.info("Testing latest revision query...");
-  try {
-    // Get latest revision for the test topic
-    const result = await db
-      .select()
-      .from(screeningResults)
-      .where(eq(screeningResults.topicId, testTopicId))
-      .orderBy(sql`${screeningResults.revisionNumber} DESC`)
-      .limit(1);
-
-    if (result.length === 0) {
-      log.error("Latest revision query failed: No data returned");
-      return false;
-    }
-
-    const latestRevision = result[0].revisionNumber;
-    if (latestRevision === 3) {
-      log.success(
-        `Latest revision query successful! Latest is revision ${latestRevision}`
-      );
-      return true;
-    } else {
-      log.error(`Expected revision 3, got ${latestRevision}`);
-      return false;
-    }
   } catch (error) {
-    log.error(`Latest revision query failed: ${error}`);
+    log.error(`Multiple screenings test failed: ${error}`);
     return false;
   }
 }
@@ -366,10 +279,15 @@ async function testScoreQueries() {
 
 async function testCleanup() {
   log.info("Cleaning up test data...");
+  if (insertedSubmissionIds.length === 0) {
+    log.warn("No inserted test rows to clean up.");
+    return true;
+  }
+
   try {
     await db
       .delete(screeningResults)
-      .where(eq(screeningResults.topicId, testTopicId));
+      .where(inArray(screeningResults.submissionId, insertedSubmissionIds));
     log.success("Cleanup successful!");
     return true;
   } catch (error) {
@@ -386,9 +304,7 @@ async function runAllTests() {
     connection: await testConnection(),
     insert: false,
     select: false,
-    multipleRevisions: false,
-    duplicatePrevention: false,
-    latestRevisionQuery: false,
+    multipleScreenings: false,
     jsonQuery: false,
     newJsonQueries: false,
     scoreQueries: false,
@@ -409,11 +325,7 @@ async function runAllTests() {
   console.log("");
   results.select = await testSelect();
   console.log("");
-  results.multipleRevisions = await testMultipleRevisions();
-  console.log("");
-  results.duplicatePrevention = await testDuplicatePrevention();
-  console.log("");
-  results.latestRevisionQuery = await testLatestRevisionQuery();
+  results.multipleScreenings = await testMultipleScreenings();
   console.log("");
   results.jsonQuery = await testJsonQuery();
   console.log("");

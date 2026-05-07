@@ -523,7 +523,7 @@ export function VerificationProof({
   const verifyWithNRAS = useCallback(async () => {
     if (!isCompleteExpectations(expectationInput)) {
       setNrasError(
-        "Hardware expectations missing. NRAS verification requires nonce, arch, device cert hash, RIM hash, UEID, and measurements."
+        "Hardware expectations missing. NRAS verification requires nonce, arch, device cert hash, and measurements."
       );
       return;
     }

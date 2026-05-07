@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import * as crypto from "@/server/crypto";
 import handler, { resetJwksCache } from "@/pages/api/verification/nras";
 import type { NextApiRequest, NextApiResponse } from "next";
 
@@ -17,6 +16,19 @@ function mockReqRes(body: any) {
     },
   } as unknown as NextApiResponse;
   return { req, res, state };
+}
+
+async function importHandlerWithCryptoMock(verified = true) {
+  vi.resetModules();
+  vi.doMock("@/server/crypto", () => ({
+    createPublicKey: vi.fn(() => ({} as any)),
+    verify: vi.fn().mockReturnValue(verified),
+  }));
+  const { default: mockedHandler } = await import(
+    "@/pages/api/verification/nras"
+  );
+  vi.resetModules();
+  return mockedHandler;
 }
 
 describe("verification/nras API", () => {
@@ -76,6 +88,7 @@ describe("verification/nras API (live path)", () => {
   beforeEach(() => {
     resetJwksCache();
     vi.restoreAllMocks();
+    vi.doUnmock("@/server/crypto");
   });
 
   it("returns 502 when NRAS response is missing JWT", async () => {
@@ -242,6 +255,7 @@ describe("verification/nras API (live path)", () => {
   });
 
   it("returns failure when device cert hash mismatches", async () => {
+    const mockedHandler = await importHandlerWithCryptoMock();
     const token = makeJwt({ nonce: "n1" });
     const fetchSpy = vi
       .fn()
@@ -285,13 +299,14 @@ describe("verification/nras API (live path)", () => {
       expectedMeasurements: ["m1"],
     });
 
-    await handler(req, res);
+    await mockedHandler(req, res);
     expect(state.status).toBe(200);
     expect(state.body?.verified).toBe(false);
     expect(state.body?.reasons).toContain("NRAS overall attestation result failed");
   });
 
   it("returns reasons when GPU arch mismatches expected", async () => {
+    const mockedHandler = await importHandlerWithCryptoMock();
     const token = makeJwt({ nonce: "n1" });
     const fetchSpy = vi
       .fn()
@@ -321,7 +336,6 @@ describe("verification/nras API (live path)", () => {
       });
 
     vi.stubGlobal("fetch", fetchSpy as any);
-    const verifySpy = vi.spyOn(crypto, "verify").mockReturnValue(true);
 
     const { req, res, state } = mockReqRes({
       nvidia_payload: { nonce: "n1", arch: "ADA", evidence_list: [] },
@@ -333,17 +347,15 @@ describe("verification/nras API (live path)", () => {
       expectedMeasurements: ["m1"],
     });
 
-    await handler(req, res);
+    await mockedHandler(req, res);
     expect(state.status).toBe(200);
     expect(state.body?.verified).toBe(false);
     expect(state.body?.reasons).toContain("NRAS overall attestation result failed");
-
-    verifySpy.mockRestore();
   });
 
   it("returns failure when RIM mismatches", async () => {
+    const mockedHandler = await importHandlerWithCryptoMock();
     const token = makeJwt({ nonce: "n1" });
-    const verifySpy = vi.spyOn(crypto, "verify").mockReturnValue(true);
     const fetchSpy = vi
       .fn()
       .mockResolvedValueOnce({
@@ -386,16 +398,15 @@ describe("verification/nras API (live path)", () => {
       expectedMeasurements: ["m1"],
     });
 
-    await handler(req, res);
-    verifySpy.mockRestore();
+    await mockedHandler(req, res);
     expect(state.status).toBe(200);
     expect(state.body?.verified).toBe(false);
     expect(state.body?.reasons).toContain("NRAS overall attestation result failed");
   });
 
   it("returns failure when UEID mismatches", async () => {
+    const mockedHandler = await importHandlerWithCryptoMock();
     const token = makeJwt({ nonce: "n1" });
-    const verifySpy = vi.spyOn(crypto, "verify").mockReturnValue(true);
     const fetchSpy = vi
       .fn()
       .mockResolvedValueOnce({
@@ -438,8 +449,7 @@ describe("verification/nras API (live path)", () => {
       expectedMeasurements: ["m1"],
     });
 
-    await handler(req, res);
-    verifySpy.mockRestore();
+    await mockedHandler(req, res);
     expect(state.status).toBe(200);
     expect(state.body?.verified).toBe(false);
     expect(state.body?.reasons).toContain("NRAS overall attestation result failed");
@@ -616,6 +626,7 @@ describe("verification/nras API (crypto mocked)", () => {
   beforeEach(() => {
     resetJwksCache();
     vi.restoreAllMocks();
+    vi.doUnmock("@/server/crypto");
   });
 
   const makeJwt = (payload: Record<string, any>, header: Record<string, any> = {}) => {
@@ -627,7 +638,7 @@ describe("verification/nras API (crypto mocked)", () => {
   };
 
   it("returns error when JWT signature verification fails", async () => {
-    vi.mock("@/server/crypto", () => ({
+    vi.doMock("@/server/crypto", () => ({
       createPublicKey: vi.fn(),
       verify: vi.fn().mockReturnValue(false),
     }));
@@ -678,7 +689,7 @@ describe("verification/nras API (crypto mocked)", () => {
   });
 
   it("returns error when nonce claim mismatches expected", async () => {
-    vi.mock("@/server/crypto", () => ({
+    vi.doMock("@/server/crypto", () => ({
       createPublicKey: vi.fn(),
       verify: vi.fn().mockReturnValue(true),
     }));
@@ -729,7 +740,7 @@ describe("verification/nras API (crypto mocked)", () => {
   });
 
   it("handles NRAS response as object with jwt/gpus", async () => {
-    vi.mock("@/server/crypto", () => ({
+    vi.doMock("@/server/crypto", () => ({
       createPublicKey: vi.fn(() => ({} as any)),
       verify: vi.fn().mockReturnValue(true),
     }));
@@ -801,7 +812,7 @@ describe("verification/nras API (crypto mocked)", () => {
   });
 
   it("returns failure and reasons when arch mismatches", async () => {
-    vi.mock("@/server/crypto", () => ({
+    vi.doMock("@/server/crypto", () => ({
       createPublicKey: vi.fn(),
       verify: vi.fn().mockReturnValue(true),
     }));
@@ -847,12 +858,15 @@ describe("verification/nras API (crypto mocked)", () => {
     });
 
     await mockedHandler(req, res);
-    expect(state.status).toBeGreaterThanOrEqual(500);
-    expect(state.body?.error ?? state.body?.reasons).toBeDefined();
+    expect(state.status).toBe(200);
+    expect(state.body?.verified).toBe(false);
+    expect(state.body?.reasons).toContain(
+      "NRAS overall attestation result failed"
+    );
   });
 
   it("returns failure when measurements missing and device cert hash mismatches", async () => {
-    vi.mock("@/server/crypto", () => ({
+    vi.doMock("@/server/crypto", () => ({
       createPublicKey: vi.fn(),
       verify: vi.fn().mockReturnValue(true),
     }));
@@ -898,8 +912,11 @@ describe("verification/nras API (crypto mocked)", () => {
     });
 
     await mockedHandler(req, res);
-    expect(state.status).toBeGreaterThanOrEqual(500);
-    expect(state.body?.error ?? state.body?.reasons).toBeDefined();
+    expect(state.status).toBe(200);
+    expect(state.body?.verified).toBe(false);
+    expect(state.body?.reasons).toContain(
+      "NRAS overall attestation result failed"
+    );
   });
 
 });
