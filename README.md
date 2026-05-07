@@ -49,13 +49,13 @@ For each failing quality criterion the model returns a self-contained markdown s
 | **Authentication** | `near-sign-verify` (NEP-413)          |
 | **UI**             | shadcn/ui, Tailwind CSS               |
 | **Tests**          | Vitest, Playwright                    |
-| **Package mgr**    | Bun                                   |
+| **Package mgr**    | pnpm                                  |
 
 ## Quick Start
 
 ```bash
 # 1. Install
-bun install
+pnpm install
 
 # 2. Configure environment
 cp .env.example .env.local
@@ -70,10 +70,10 @@ cp .env.example .env.local
 #       denies all requests.
 
 # 3. Run migrations
-bun run db:migrate
+pnpm run db:migrate
 
 # 4. Start
-bun run dev
+pnpm run dev
 ```
 
 The dev server runs at <http://localhost:3000>. The two pages are `/` (the screener form) and `/screening/<submissionId>` (a read-only view of a saved screening).
@@ -149,7 +149,7 @@ Optional:
 - `INTEL_TDX_ATTESTATION_URL` + `INTEL_TDX_API_KEY` (TEE attestation; if unset, attestation verification is skipped)
 - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 
-Confirm `VERIFY_USE_MOCKS` is **unset** in production. After provisioning, run `bun run db:migrate` against the production database to create the `screening_results` table.
+Confirm `VERIFY_USE_MOCKS` is **unset** in production. Railway runs `pnpm run db:migrate:deploy` before each deployment; for a manual production migration, run that same command with `DATABASE_URL` or `RAILWAY_DATABASE_URL` set.
 
 ## Repository Layout
 
