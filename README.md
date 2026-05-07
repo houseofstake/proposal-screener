@@ -7,15 +7,15 @@ BETA tool for **evaluating NEAR governance proposal drafts** with AI. Paste a pr
 
 This repo is a stripped-down fork of the broader [NEAR Governance Dashboard](https://github.com/houseofstake/neargov). Discourse summarisation, conversational drafting, revision tracking, and the rest of the dashboard surface area have all been removed; what remains is the single screening pipeline.
 
-> **Status: internal preview (v1).** Access is gated to a fixed allowlist of NEAR accounts. Screening results are shareable across the allowlist via a stable URL.
+> **Status: internal preview (v1).** Access requires a NEAR wallet signature. Screening results are private to the submitting account.
 
 ## User Journey
 
 1. Paste a proposal title and body into the screener.
-2. Connect a NEAR wallet (NEP-413 sign-in). Your account ID must be on the internal allowlist.
+2. Connect a NEAR wallet (NEP-413 sign-in).
 3. The proposal is screened by `openai/gpt-oss-120b` on NEAR AI Cloud.
 4. The UI renders pass/fail per criterion, attention scores, an overall summary, and — for any failing quality criterion — a markdown **suggested edit** the author can paste back into the draft.
-5. Each run is persisted under a server-generated `submissionId` and gets a shareable read-only URL (`/screening/<submissionId>`) any allowlisted teammate can open.
+5. Each run is persisted under a server-generated `submissionId` and gets a read-only URL (`/screening/<submissionId>`) the submitting wallet can open later.
 
 ## Screening Criteria
 
@@ -59,15 +59,12 @@ pnpm install
 
 # 2. Configure environment
 cp .env.example .env.local
-# Required:  DATABASE_URL, NEAR_AI_CLOUD_API_KEY, NEAR_ACCESS_ALLOWLIST
+# Required:  DATABASE_URL, NEAR_AI_CLOUD_API_KEY
 # Optional:  NEXT_PUBLIC_PLAUSIBLE_DOMAIN, NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-#            NEXT_PUBLIC_SITE_URL / APP_BASE_URL,
+#            NEXT_PUBLIC_SITE_URL,
 #            INTEL_TDX_ATTESTATION_URL + INTEL_TDX_API_KEY (for TEE attestation),
 #            VERIFY_USE_MOCKS=true (skips Intel / NRAS calls in dev)
 # Note: NEAR network id is auto-selected — testnet in dev, mainnet in production.
-#       In development, leaving NEAR_ACCESS_ALLOWLIST empty falls back to
-#       "allow all" with a console warning. In production, an empty allowlist
-#       denies all requests.
 
 # 3. Run migrations
 pnpm run db:migrate
@@ -80,29 +77,21 @@ The dev server runs at <http://localhost:3000>. The two pages are `/` (the scree
 
 ## Access control
 
-Both `/api/screen` and `/api/getAnalysis/[submissionId]` are gated by NEP-413 wallet authentication **plus** a server-side allowlist. After the wallet signature is verified, the recovered `accountId` is checked against `NEAR_ACCESS_ALLOWLIST` (a comma-separated list of NEAR account IDs, e.g. `alice.near,bob.near,carol.near,dave.near`). Non-allowlisted accounts receive `403 { error: "not_authorized" }` before any rate-limiting or external calls happen.
-
-Allowlist semantics:
-
-- **Production:** an empty or unset `NEAR_ACCESS_ALLOWLIST` denies all requests and logs a warning at boot.
-- **Development:** an empty allowlist falls back to "allow all" with a console warning, so local dev isn't blocked.
-- Whitespace around entries is trimmed; matching is exact on the trimmed lowercased account ID.
-
-The allowlist also governs **read sharing**: any allowlisted account can fetch any saved `submissionId` via `GET /api/getAnalysis/[submissionId]`, not only the original submitter. This is what makes the `/screening/<submissionId>` share links work across the team. Future iterations may introduce per-result visibility controls.
+Both `/api/screen` and `/api/getAnalysis/[submissionId]` are gated by NEP-413 wallet authentication. Saved analyses are readable only by the original submitting wallet; other accounts receive a 404 for that `submissionId`.
 
 ## Pages
 
 | Route                          | Description                                                                                            |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `/`                            | Screener form. Paste → wallet sign → screen → result with a "Copy share link" button.                  |
-| `/screening/<submissionId>`    | Read-only view of a saved screening. Requires wallet connect + sign; gated by `NEAR_ACCESS_ALLOWLIST`. |
+| `/screening/<submissionId>`    | Read-only view of a saved screening. Requires wallet connect + sign as the original submitting account. |
 
 ## API Endpoints
 
 | Method | Path                                | Auth                | Purpose                                                       |
 | ------ | ----------------------------------- | ------------------- | ------------------------------------------------------------- |
-| `POST` | `/api/screen`                       | NEP-413 + allowlist | Sanitize → screen via NEAR AI → persist → return result.      |
-| `GET`  | `/api/getAnalysis/[submissionId]`   | NEP-413 + allowlist | Fetch a saved screening. Readable by any allowlisted account. |
+| `POST` | `/api/screen`                       | NEP-413 | Sanitize → screen via NEAR AI → persist → return result.      |
+| `GET`  | `/api/getAnalysis/[submissionId]`   | NEP-413 | Fetch a saved screening. Readable by the original submitting account. |
 | `GET`  | `/api/verification/proof`           | -                   | Verifiable-inference proof retrieval.                         |
 | `GET`  | `/api/verification/nras`            | -                   | NRAS attestation lookup.                                      |
 | `POST` | `/api/verification/register-session`| -                   | Register a verification session.                              |
@@ -121,35 +110,34 @@ The allowlist also governs **read sharing**: any allowlisted account can fetch a
 }
 ```
 
-The corresponding share URL is `${NEXT_PUBLIC_SITE_URL}/screening/<submissionId>`.
+The corresponding result URL is `${NEXT_PUBLIC_SITE_URL}/screening/<submissionId>`.
 
 ## Authentication Flow
 
-The client uses `near-sign-verify`'s `sign()` to produce a Bearer token from the connected wallet (`recipient: "social.near"`). The server verifies the token in `src/server/screening.ts` via `verify(token, { expectedRecipient: "social.near", nonceMaxAge: 5min })` and treats the recovered `accountId` as the authenticated caller. The `accountId` is then checked against `NEAR_ACCESS_ALLOWLIST` in `src/server/accessControl.ts` before any further work.
+The client uses `near-sign-verify`'s `sign()` to produce a Bearer token from the connected wallet (`recipient: "social.near"`). The server verifies the token in `src/server/screening.ts` via `verify(token, { expectedRecipient: "social.near", nonceMaxAge: 5min })` and treats the recovered `accountId` as the authenticated caller.
 
 Rate limiting is keyed off `accountId` and configured in `src/config/rateLimit.ts`.
 
 ## Persistence Model
 
-All results are persisted to a single `screening_results` table keyed on a server-generated UUID `submissionId`. There is no notion of revisions, topics, or external forum sources — every screening run is a fresh row. Saved rows are readable by any allowlisted account; the submitter is recorded on the row but does not restrict reads.
+All results are persisted to a single `screening_results` table keyed on a server-generated UUID `submissionId`. There is no notion of revisions, topics, or external forum sources — every screening run is a fresh row. Saved rows are readable only by the submitting NEAR account.
 
 See `src/lib/db/schema.ts` and `drizzle/0000_init_screening_results.sql` for the exact shape.
 
 ## Deployment
 
-The v1 internal preview runs on **Vercel** with a managed **Neon** Postgres. Required production env vars:
+The v1 internal preview runs on **Railway** with Railway Postgres. Required production env vars:
 
 - `NEAR_AI_CLOUD_API_KEY`
-- `DATABASE_URL` (Neon connection string)
-- `NEAR_ACCESS_ALLOWLIST` (comma-separated NEAR account IDs)
-- `NEXT_PUBLIC_SITE_URL` and `APP_BASE_URL` (the deployed origin)
+- `DATABASE_URL=${{Postgres.DATABASE_URL}}`
 
 Optional:
 
+- `NEXT_PUBLIC_SITE_URL` (only if you want to force a custom canonical origin; otherwise Railway's public domain is used)
 - `INTEL_TDX_ATTESTATION_URL` + `INTEL_TDX_API_KEY` (TEE attestation; if unset, attestation verification is skipped)
 - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 
-Confirm `VERIFY_USE_MOCKS` is **unset** in production. Railway runs `pnpm run db:migrate:deploy` before each deployment; for a manual production migration, run that same command with `DATABASE_URL` or `RAILWAY_DATABASE_URL` set.
+Confirm `VERIFY_USE_MOCKS` is **unset** in production. Railway runs `pnpm run db:migrate:deploy` before each deployment; for a manual production migration, run that same command with `DATABASE_URL` set.
 
 ## Repository Layout
 
@@ -167,10 +155,10 @@ src/
 │   ├── prompts/              screenProposal.ts (the screening prompt)
 │   └── analytics.ts          Plausible
 ├── pages/
-│   ├── api/screen.ts         POST screen + persist (NEP-413 + allowlist)
-│   ├── api/getAnalysis/      GET stored analysis (NEP-413 + allowlist)
+│   ├── api/screen.ts         POST screen + persist (NEP-413)
+│   ├── api/getAnalysis/      GET stored analysis (NEP-413)
 │   ├── api/verification/     Attestation endpoints
-│   ├── screening/            [submissionId].tsx — read-only share view
+│   ├── screening/            [submissionId].tsx — read-only result view
 │   └── index.tsx             Renders <ProposalScreener />
 ├── server/                   Server-only screening, auth, and access-control helpers
 ├── types/                    Evaluation + verification types

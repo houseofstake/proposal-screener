@@ -19,17 +19,21 @@ const normalizeBaseUrl = (input?: string | null) => {
   return input;
 };
 
+const platformBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
+  return null;
+};
+
 export async function prefetchVerificationProof(
   originHint: string | undefined,
   params: PrefetchParams
 ): Promise<VerificationProofResponse | null> {
   const baseUrl =
-    normalizeBaseUrl(
-      originHint ||
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        process.env.APP_BASE_URL ||
-        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-    ) || "http://localhost:3000";
+    normalizeBaseUrl(originHint || platformBaseUrl()) ||
+    "http://localhost:3000";
 
   try {
     const response = await fetch(`${baseUrl}/api/verification/proof`, {

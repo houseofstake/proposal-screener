@@ -353,9 +353,13 @@ export default async function handler(
     Authorization: `Bearer ${apiKey}`,
     "Content-Type": "application/json",
   };
+  const platformOrigin = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : null;
   const origin =
     req.headers.origin ||
     process.env.NEXT_PUBLIC_SITE_URL ||
+    platformOrigin ||
     `http://${req.headers.host || "localhost:3000"}`;
 
   try {
@@ -544,9 +548,7 @@ export default async function handler(
         proof.attestation?.model_attestations?.[0]?.intel_quote;
 
       if (intelQuote) {
-        const intelUrl =
-          process.env.INTEL_TDX_ATTESTATION_URL ||
-          process.env.INTEL_ATTESTATION_URL;
+        const intelUrl = process.env.INTEL_TDX_ATTESTATION_URL;
 
         if (!intelUrl) {
           proof.intel = {
