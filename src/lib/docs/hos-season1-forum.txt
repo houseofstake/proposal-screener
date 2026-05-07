@@ -1,0 +1,179 @@
+The House of Stake is entering its next phase, as we continue to evolve governance for the NEAR ecosystem.
+
+With this post, we provide an overview of what lies ahead, our priorities and roadmap through the end of 2026, marking Season #1 of House of Stake 2.0.
+
+# House of Stake 2.0 – The Mandate
+
+![House of Stake 2.0-Image 2|690x388](upload://4Pzlg3URVdlvPM4rtBj1Eg38l4C.jpeg)
+
+At its core, [House of Stake’s mandate](https://houseofstake.org/blog/House-of-Stake-2.0) going forward is to govern the economic parameters of the NEAR ecosystem.
+
+#### Value Accrual
+
+Support the long-term health and utility of the NEAR ecosystem through transparent governance.
+
+#### Sustainable Allocation
+
+Deploy revenues strategically to nurture long-term ecosystem growth.
+
+#### Aligned Decision-Making
+
+Enable token-based governance that aligns incentives across stakeholders and strengthens NEAR’s long-term resilience.
+
+#### Defining Economic Policy of the NEAR Ecosystem
+
+Coordinating future updates to emissions, fees, and incentive design as the NEAR ecosystem scales and adoption expands.
+
+These four pillars build on and further refine House of Stake’s past mandate announced in October 2025.
+
+## Here’s why
+
+House of Stake exists to empower tokenholders to govern the NEAR ecosystem collectively and responsibly. But governance must be focused.
+
+We have learned from past DAO experiments across the industry: governance without a clear mandate drifts.
+
+House of Stake is evolving into NEAR’s Treasury Governance Engine — an independent body focused on economic policy.
+
+As the NEAR ecosystem grows and network usage increases, including activity through NEAR Intents and other ecosystem products, House of Stake will gradually take on a larger role in the stewardship of these funds, subject to community, governance, and regulatory conditions.
+
+All proposals within the House of Stake must align with this mandate. It is the responsibility of the Screening Committee to ensure strict adherence.
+
+We are actively seeking proposals that address:
+
+* Value Capture & Inflation Optimization
+* Expansion of ecosystem value accrual initiatives
+* Innovation in the management and monetization of NEAR-native assets (e.g., top-level domains)
+* Use of protocol revenues to reduce or better manage current emissions.
+
+# New Team and Organizational Setup
+
+As announced [in our recent blog post](https://houseofstake.org/blog/House-of-Stake-2.0) we have updated the House of Stake team structure.
+
+#### Governance & Operations Workstream:
+
+* Head of Governance
+* HoS Operations Manager
+* Responsible for governance design, administration, and serving as the interface between House of Stake tokenholders and the HoS Foundation, the legal entity established to support the operational, legal, and administrative needs of House of Stake initiatives
+
+#### Product & Protocol Workstream:
+
+* BuilderOps Contributors and Engineering Team (Focused on backend, smart contracts, and infrastructure; driving product development and operational execution.)
+* Agora Front-End Team (Support with front-end fixes, bugs, docs and troubleshooting.)
+
+The team’s objective is to operate as a lean, agile unit focused on product excellence and operational efficiency.
+
+![House of Stake 2.0-Image 3|690x388](upload://5s9LqGVqY0i1wVrUGWaJAbKKCLu.jpeg)
+
+
+# Towards Operational & Financial Independence
+
+The House of Stake is on a path toward [full independence from the NEAR Foundation](https://gov.near.org/t/key-principles-for-hos-constitutional-documents-and-our-roadmap-in-2026/41975).
+
+In the coming weeks, we will take a major step forward: following the [the successful vote to transfer the assets of the NEAR Community Purpose Trust to the House of Stake Foundation](https://gov.near.org/t/proposal-to-terminate-the-near-community-purpose-trust-by-the-transfer-of-all-of-its-assets-to-the-house-of-stake-foundation/42051), House of Stake will operate with a dedicated, active treasury.
+
+This marks the transition to full responsibility for:
+
+* Managing House of Stake funds
+* Establishing operational capacity
+* Executing on governance decisions
+
+This includes foundational infrastructure such as:
+
+* Bank accounts and financial rails
+* Multisig policies
+* Dedicated HoS IT infrastructure
+
+As well as compliance requirements:
+
+* KYC/KYB processes for programs such as MPC Signer
+
+And most importantly, economic governance — [delivering on our mandate](https://houseofstake.org/blog/House-of-Stake-2.0).
+
+#### We will begin with budgeting:
+
+* What should the House of Stake allocate to operations?
+* Which roles and services are required based on our mandate, responsibilities and compliance through 2026?
+* How can we ensure House of Stake acts responsibly, taking a value-creation, not value-extraction approach?
+* How do we maintain execution quality after decisions are made?
+
+A detailed budget proposal will be published shortly. With this, House of Stake will transition into an independent institution, combining tokenholder governance with a compliant operational entity.
+
+# Experiments and Learnings: Working in Seasons
+
+The House of Stake is still early. We are exploring how to act in the best interest of NEAR, and there is no predefined playbook.
+
+To support this, we will operate in Seasons.
+
+Seasons are designed to:
+
+* Run experiments
+* Iterate on governance design
+* Improve accessibility, efficiency, and outcomes
+
+Season #1 will run from April 01 to December 31, 2026.
+
+During this period, we will introduce and test new mechanisms across governance, and introduce new members of the Screening Committee and Security Council. The goal is to learn quickly, adapt where needed, and build conviction before formalizing changes in policy and constitutional frameworks.
+
+# Endorsed Delegates Role Paused
+
+The initial design of House of Stake included Endorsed Delegates, formally approved governance participants selected through a competitive process by the Screening Committee. The goal was to establish a reliable base of value-aligned participants meeting high standards of transparency and engagement, and thus, to attract capital locking NEAR for governance power.
+
+However, early data (as of March 23) shows:
+
+* **Locking NEAR is primarily driven by proposals, not by formal roles or delegate performance**. At House of Stake, [periods with active proposals exhibit substantially higher average daily increases in locked NEAR than periods without proposals](https://gov.near.org/t/hsp-003-venear-holder-rewards-program/41688/33). At the same time, some delegates accumulated substantial voting power despite abstaining or participating minimally in votes.
+* **Delegation largely follows existing relationships and trust networks, rather than formal endorsement**. Only 13 regular delegates, and just 5 of 11 Endorsed Delegates, received veNEAR from more than one external address.
+* **Tokenholders who lock NEAR tend to seek direct influence, and self-delegate**. Of the 425 addresses that locked NEAR, only 139 delegated to another address (32.7%), and just 56 delegated to an Endorsed Delegate (13.18%).
+
+Based on these learnings, we will pause the Endorsed Delegates role in Season #1.
+
+We believe there is still a place for high-quality, high-impact delegates. However, this role should evolve organically and be grounded in observed behavior and emerging needs.
+
+#### The Delegates Roles at House of Stake going forward:
+
+At House of Stake we envision the delegate role to evolve along the following principles:
+
+* Encourage organic growth of governance participation
+* Prioritize intrinsic motivation over paid or “professional” voting roles
+* Avoid artificial incentives for governance participation
+* Emphasize conviction: participants should be willing to lock capital and engage because decisions matter
+
+In Season #1, all delegates will operate on equal footing, differentiated only by veNEAR voting power, reflecting either delegated trust or direct stake.
+
+# A New, Experimental Proposal Process
+
+We recently ratified a robust proposal process incorporating key learnings from House of Stake’s early phase. It includes strong checks, balances, and security mechanisms.
+
+However, it comes with a trade-off: proposals can take more than 30 days from submission to execution, which creates friction for both proposers and voters.
+
+In Season #1, we will introduce a second, experimental proposal process optimized for speed and efficiency. This alternative process will exist as a compliment to the current proposal process while we experiment with improving proposal timelines.
+
+This process will:
+
+* Represent a more agile alternative
+* Run in parallel with the current system
+* Allow us to compare outcomes and gather real-world insights
+
+The goal is not to replace rigor, but to find the right balance between security and execution speed.
+
+We will share full details in a dedicated post, including design specifications and safeguards.
+
+### Current timeline
+
+* **New proposal process implementation:** April 2026
+* **Active in voting and data collection:** May – November 2026
+* **strong text**Evaluation, discussion, and ratification vote: December 2026
+
+# The Future is NEAR!
+
+House of Stake 2.0 introduces significant changes — but the core objective remains unchanged:
+
+#### Make high-quality decisions in the best interest of NEAR.
+
+We are building a governance system that is:
+
+* Focused in mandate
+* Lean in execution
+* Adaptive in design
+* Accountable in outcomes
+
+Let’s build it.

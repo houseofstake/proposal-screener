@@ -1,0 +1,6 @@
+[build]
+builder = "bun"
+buildCommand = "bun install && bun run build"
+
+[start]
+startCommand = "bun run db:push --force && bun run start"
