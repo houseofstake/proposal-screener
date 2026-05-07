@@ -137,7 +137,7 @@ Optional:
 - `INTEL_TDX_ATTESTATION_URL` + `INTEL_TDX_API_KEY` (TEE attestation; if unset, attestation verification is skipped)
 - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 
-Confirm `VERIFY_USE_MOCKS` is **unset** in production. Railway runs `pnpm run db:migrate:deploy` before each deployment; for a manual production migration, run that same command with `DATABASE_URL` set.
+Confirm `VERIFY_USE_MOCKS` is **unset** in production. Railway runs `pnpm run db:migrate` before each deployment; for a manual production migration, run that same command with `DATABASE_URL` set.
 
 ## Repository Layout
 
