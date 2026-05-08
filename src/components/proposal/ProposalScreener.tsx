@@ -1,6 +1,6 @@
-import { useState } from "react";
-import type { Evaluation, EvaluationCriterion } from "@/types/evaluation";
-import type { VerificationMetadata } from "@/types/agui-events";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,27 +8,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { VerificationProof } from "@/components/verification/VerificationProof";
+import { useNear } from "@/hooks/useNear";
+import type { VerificationMetadata } from "@/types/agui-events";
+import type { Evaluation, EvaluationCriterion } from "@/types/evaluation";
 import {
   AlertCircle,
-  CheckCircle2,
   AlertTriangle,
+  Check,
+  CheckCircle2,
+  Copy,
+  Eye,
   Loader2,
   Shield,
   TrendingUp,
-  Eye,
   Wand2,
-  Copy,
-  Check,
 } from "lucide-react";
-import { VerificationProof } from "@/components/verification/VerificationProof";
-import { useNear } from "@/hooks/useNear";
+import { useState } from "react";
 
 type QualityKey =
   | "complete"
@@ -54,7 +54,7 @@ const QUALITY_LABELS: Record<QualityKey, string> = {
  */
 async function signAuthToken(
   wallet: unknown,
-  message: string
+  message: string,
 ): Promise<string> {
   const { sign } = await import("near-sign-verify");
   return sign(message, {
@@ -103,7 +103,7 @@ export const ProposalScreener = () => {
     try {
       const authToken = await signAuthToken(
         wallet,
-        `Screen proposal: ${title.slice(0, 80)}`
+        `Screen proposal: ${title.slice(0, 80)}`,
       );
 
       const response = await fetch("/api/screen", {
@@ -125,7 +125,7 @@ export const ProposalScreener = () => {
           // ignore JSON errors
         }
         throw new Error(
-          errorMessage || `API request failed: ${response.status}`
+          errorMessage || `API request failed: ${response.status}`,
         );
       }
 
@@ -141,7 +141,7 @@ export const ProposalScreener = () => {
       setSubmissionId(data.submissionId ?? null);
       setVerificationMeta(data.verification ?? null);
       setVerificationId(
-        data.verificationId ?? data.verification?.messageId ?? null
+        data.verificationId ?? data.verification?.messageId ?? null,
       );
       setModel(data.model ?? data.evaluation?.model ?? null);
     } catch (err: unknown) {
@@ -169,7 +169,7 @@ export const ProposalScreener = () => {
   const renderQualityCriterion = (
     key: QualityKey,
     label: string,
-    criterion: EvaluationCriterion
+    criterion: EvaluationCriterion,
   ) => {
     const hasSuggestion =
       !criterion.pass &&
@@ -246,7 +246,7 @@ export const ProposalScreener = () => {
             <CardDescription className="text-base">
               <strong>Private Governance Proposal Reviews</strong>
             </CardDescription>
-            <CardDescription>Built on NEAR AI Cloud</CardDescription>
+            {/* <CardDescription>Built on NEAR AI Cloud</CardDescription> */}
           </CardHeader>
 
           <CardContent className="space-y-6">
@@ -381,23 +381,25 @@ export const ProposalScreener = () => {
                 <div className="space-y-3">
                   <h3 className="text-lg font-semibold">Quality Criteria</h3>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {(Object.keys(QUALITY_LABELS) as QualityKey[]).map((key) => {
-                      const criterion = result[key] as
-                        | EvaluationCriterion
-                        | undefined;
-                      if (
-                        !criterion ||
-                        typeof criterion !== "object" ||
-                        !("pass" in criterion)
-                      ) {
-                        return null;
-                      }
-                      return renderQualityCriterion(
-                        key,
-                        QUALITY_LABELS[key],
-                        criterion
-                      );
-                    })}
+                    {(Object.keys(QUALITY_LABELS) as QualityKey[]).map(
+                      (key) => {
+                        const criterion = result[key] as
+                          | EvaluationCriterion
+                          | undefined;
+                        if (
+                          !criterion ||
+                          typeof criterion !== "object" ||
+                          !("pass" in criterion)
+                        ) {
+                          return null;
+                        }
+                        return renderQualityCriterion(
+                          key,
+                          QUALITY_LABELS[key],
+                          criterion,
+                        );
+                      },
+                    )}
                   </div>
                 </div>
 
@@ -413,8 +415,8 @@ export const ProposalScreener = () => {
                               result.relevant?.score === "high"
                                 ? "default"
                                 : result.relevant?.score === "medium"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }
                           >
                             {result.relevant?.score?.toUpperCase() || "UNKNOWN"}
@@ -437,8 +439,8 @@ export const ProposalScreener = () => {
                               result.material?.score === "high"
                                 ? "default"
                                 : result.material?.score === "medium"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }
                           >
                             {result.material?.score?.toUpperCase() || "UNKNOWN"}
