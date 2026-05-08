@@ -13,7 +13,7 @@ This repo is a stripped-down fork of the broader [NEAR Governance Dashboard](htt
 
 1. Paste a proposal title and body into the screener.
 2. Connect a NEAR wallet (NEP-413 sign-in).
-3. The proposal is screened by `openai/gpt-oss-120b` on NEAR AI Cloud.
+3. The proposal is screened by the configured AI provider. By default this is `openai/gpt-oss-120b` on NEAR AI Cloud; `SCREENING_MODEL_PROVIDER=minimax` switches screening to MiniMax.
 4. The UI renders pass/fail per criterion, attention scores, an overall summary, and — for any failing quality criterion — a markdown **suggested edit** the author can paste back into the draft.
 5. Each run is persisted under a server-generated `submissionId` and gets a read-only URL (`/screening/<submissionId>`) the submitting wallet can open later.
 
@@ -44,7 +44,7 @@ For each failing quality criterion the model returns a self-contained markdown s
 | **Framework**      | Next.js (Pages Router)                |
 | **Language**       | TypeScript                            |
 | **Database**       | PostgreSQL + Drizzle ORM              |
-| **AI Provider**    | NEAR AI Cloud (`openai/gpt-oss-120b`) |
+| **AI Provider**    | NEAR AI Cloud (`openai/gpt-oss-120b`) or MiniMax (`MiniMax-M2.7`) |
 | **NEAR Wallet**    | `@hot-labs/near-connect`              |
 | **Authentication** | `near-sign-verify` (NEP-413)          |
 | **UI**             | shadcn/ui, Tailwind CSS               |
@@ -59,10 +59,12 @@ pnpm install
 
 # 2. Configure environment
 cp .env.example .env.local
-# Required:  DATABASE_URL, NEAR_AI_CLOUD_API_KEY
+# Required:  DATABASE_URL plus the selected provider key:
+#            NEAR_AI_CLOUD_API_KEY (nearai) or MINIMAX_API_KEY (minimax)
 # Optional:  NEXT_PUBLIC_PLAUSIBLE_DOMAIN, NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
 #            NEXT_PUBLIC_SITE_URL,
 #            INTEL_TDX_ATTESTATION_URL + INTEL_TDX_API_KEY (for TEE attestation),
+#            SCREENING_MODEL_PROVIDER=minimax + MINIMAX_API_KEY,
 #            VERIFY_USE_MOCKS=true (skips Intel / NRAS calls in dev)
 # Note: NEAR network id is auto-selected — testnet in dev, mainnet in production.
 
@@ -90,7 +92,7 @@ Both `/api/screen` and `/api/getAnalysis/[submissionId]` are gated by NEP-413 wa
 
 | Method | Path                                | Auth                | Purpose                                                       |
 | ------ | ----------------------------------- | ------------------- | ------------------------------------------------------------- |
-| `POST` | `/api/screen`                       | NEP-413 | Sanitize → screen via NEAR AI → persist → return result.      |
+| `POST` | `/api/screen`                       | NEP-413 | Sanitize → screen via configured AI provider → persist → return result. |
 | `GET`  | `/api/getAnalysis/[submissionId]`   | NEP-413 | Fetch a saved screening. Readable by the original submitting account. |
 | `GET`  | `/api/verification/proof`           | -                   | Verifiable-inference proof retrieval.                         |
 | `GET`  | `/api/verification/nras`            | -                   | NRAS attestation lookup.                                      |
@@ -128,11 +130,15 @@ See `src/lib/db/schema.ts` and `drizzle/0000_init_screening_results.sql` for the
 
 The v1 internal preview runs on **Railway** with Railway Postgres. Required production env vars:
 
-- `NEAR_AI_CLOUD_API_KEY`
+- `NEAR_AI_CLOUD_API_KEY` when `SCREENING_MODEL_PROVIDER` is unset or `nearai`
+- `MINIMAX_API_KEY` when `SCREENING_MODEL_PROVIDER=minimax`
 - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
 
 Optional:
 
+- `SCREENING_MODEL_PROVIDER` (`nearai` by default; also accepts `nirai` / `near`; set `minimax` for MiniMax)
+- `NEAR_AI_MODEL` (defaults to `openai/gpt-oss-120b`)
+- `MINIMAX_MODEL` (defaults to `MiniMax-M2.7`)
 - `NEXT_PUBLIC_SITE_URL` (only if you want to force a custom canonical origin; otherwise Railway's public domain is used)
 - `INTEL_TDX_ATTESTATION_URL` + `INTEL_TDX_API_KEY` (TEE attestation; if unset, attestation verification is skipped)
 - `NEXT_PUBLIC_PLAUSIBLE_DOMAIN`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`

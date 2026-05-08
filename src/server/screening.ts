@@ -1,16 +1,16 @@
-import type { NextApiResponse } from "next";
-import type { Evaluation } from "@/types/evaluation";
+import { buildScreeningPrompt } from "@/lib/prompts/screenProposal";
 import type { VerificationMetadata } from "@/types/agui-events";
+import type { Evaluation } from "@/types/evaluation";
 import {
   extractVerificationMetadata,
   normalizeVerificationPayload,
 } from "@/utils/verification";
-import { buildScreeningPrompt } from "@/lib/prompts/screenProposal";
 import {
   verify,
   type VerificationResult,
   type VerifyOptions,
 } from "near-sign-verify";
+import type { NextApiResponse } from "next";
 
 type ScreeningErrorDetails = {
   code?: string;
@@ -29,7 +29,7 @@ export class ScreeningError extends Error {
   constructor(
     statusCode: number,
     message: string,
-    details?: ScreeningErrorDetails
+    details?: ScreeningErrorDetails,
   ) {
     super(message);
     this.statusCode = statusCode;
@@ -45,7 +45,7 @@ const CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/g;
 
 export function sanitizeProposalInput(
   title?: string,
-  content?: string
+  content?: string,
 ): { title: string; content: string } {
   if (!title || !title.trim()) {
     throw new ScreeningError(400, "Proposal title is required");
@@ -58,14 +58,14 @@ export function sanitizeProposalInput(
   if (title.length > MAX_TITLE_LENGTH) {
     throw new ScreeningError(
       400,
-      `Title too long (max ${MAX_TITLE_LENGTH} characters)`
+      `Title too long (max ${MAX_TITLE_LENGTH} characters)`,
     );
   }
 
   if (content.length > MAX_CONTENT_LENGTH) {
     throw new ScreeningError(
       400,
-      `Proposal too long (max ${MAX_CONTENT_LENGTH} characters)`
+      `Proposal too long (max ${MAX_CONTENT_LENGTH} characters)`,
     );
   }
 
@@ -99,7 +99,7 @@ export function sanitizeProposalInput(
 
 export async function verifyNearAuth(
   authHeader: string | undefined,
-  options?: VerifyOptions
+  options?: VerifyOptions,
 ): Promise<{ token: string; result: VerificationResult }> {
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     throw new ScreeningError(401, "NEAR authentication required", {
@@ -135,49 +135,115 @@ export interface EvaluationRequestResult {
   model: string;
 }
 
+export type ScreeningModelProvider = "nearai" | "minimax";
+
+type ScreeningProviderConfig = {
+  provider: ScreeningModelProvider;
+  label: string;
+  apiKeyEnv: string;
+  apiKey?: string;
+  baseUrl: string;
+  model: string;
+  supportsVerification: boolean;
+};
+
+const DEFAULT_SCREENING_PROVIDER: ScreeningModelProvider = "nearai";
+
+export function resolveScreeningModelProvider(
+  value = process.env.SCREENING_MODEL_PROVIDER,
+): ScreeningModelProvider {
+  if (!value) return DEFAULT_SCREENING_PROVIDER;
+
+  if (value === "minimax") {
+    return "minimax";
+  }
+
+  if (value === "nearai") {
+    return "nearai";
+  }
+
+  throw new ScreeningError(500, "Unsupported AI provider configured", {
+    code: "unsupported_ai_provider",
+    details:
+      "Use SCREENING_MODEL_PROVIDER=nearai or SCREENING_MODEL_PROVIDER=minimax",
+  });
+}
+
+function stripTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function getScreeningProviderConfig(
+  provider = resolveScreeningModelProvider(),
+): ScreeningProviderConfig {
+  if (provider === "minimax") {
+    return {
+      provider,
+      label: "MiniMax",
+      apiKeyEnv: "MINIMAX_API_KEY",
+      apiKey: process.env.MINIMAX_API_KEY,
+      baseUrl: stripTrailingSlash(
+        process.env.MINIMAX_BASE_URL ?? "https://api.minimax.io/v1",
+      ),
+      model: process.env.MINIMAX_MODEL ?? "MiniMax-M2.7",
+      supportsVerification: false,
+    };
+  }
+
+  return {
+    provider,
+    label: "NEAR AI",
+    apiKeyEnv: "NEAR_AI_CLOUD_API_KEY",
+    apiKey: process.env.NEAR_AI_CLOUD_API_KEY,
+    baseUrl: stripTrailingSlash(
+      process.env.NEAR_AI_CLOUD_BASE_URL ?? "https://cloud-api.near.ai/v1",
+    ),
+    model: process.env.NEAR_AI_MODEL ?? "openai/gpt-oss-120b",
+    supportsVerification: true,
+  };
+}
+
 export async function requestEvaluation(
   title: string,
-  content: string
+  content: string,
 ): Promise<EvaluationRequestResult> {
-  const apiKey = process.env.NEAR_AI_CLOUD_API_KEY;
-  if (!apiKey) {
-    throw new ScreeningError(500, "AI API not configured");
+  const config = getScreeningProviderConfig();
+  if (!config.apiKey) {
+    throw new ScreeningError(500, "AI API not configured", {
+      code: "missing_api_key",
+      details: `${config.apiKeyEnv} is required for ${config.label} screening`,
+    });
   }
 
   const prompt = buildScreeningPrompt(title, content);
 
-  const model = "openai/gpt-oss-120b";
-
-  const response = await fetch(
-    "https://cloud-api.near.ai/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-      }),
-    }
-  );
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.model,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response
       .text()
       .catch(() => "Failed to read error body");
     console.error(
-      "[Screening] NEAR AI API error:",
+      `[Screening] ${config.label} API error:`,
       response.status,
       response.statusText,
-      errorText
+      errorText,
     );
     const statusCategory =
       response.status === 504
-        ? "NEAR AI timed out while evaluating the proposal. Please try again or shorten the content."
-        : "NEAR AI API error";
+        ? `${config.label} timed out while evaluating the proposal. Please try again or shorten the content.`
+        : `${config.label} API error`;
 
     throw new ScreeningError(502, statusCategory, {
       status: response.status,
@@ -207,31 +273,39 @@ export async function requestEvaluation(
   ) {
     throw new ScreeningError(
       500,
-      "Invalid evaluation structure returned by AI"
+      "Invalid evaluation structure returned by AI",
     );
   }
 
-  evaluation.model = model;
+  evaluation.model = config.model;
 
-  const verificationRaw = extractVerificationMetadata(data);
-  const verificationMessageId = data?.id ?? data?.choices?.[0]?.id ?? undefined;
-  const { verification, verificationId } = normalizeVerificationPayload(
-    verificationRaw,
-    verificationMessageId
-  );
+  let verification: VerificationMetadata | undefined;
+  let verificationId: string | null = null;
+
+  if (config.supportsVerification) {
+    const verificationRaw = extractVerificationMetadata(data);
+    const verificationMessageId =
+      data?.id ?? data?.choices?.[0]?.id ?? undefined;
+    const normalized = normalizeVerificationPayload(
+      verificationRaw,
+      verificationMessageId,
+    );
+    verification = normalized.verification;
+    verificationId = normalized.verificationId;
+  }
 
   return {
     evaluation,
     verification,
     verificationId: verificationId ?? undefined,
-    model,
+    model: config.model,
   };
 }
 
 export function respondWithScreeningError(
   res: NextApiResponse,
   error: unknown,
-  fallbackMessage?: string
+  fallbackMessage?: string,
 ) {
   if (error instanceof ScreeningError) {
     const detailMessage =
