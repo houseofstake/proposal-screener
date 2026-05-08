@@ -55,8 +55,8 @@ export const Navigation = () => {
               priority
               src={NearLogo}
               alt="NEAR"
-              width={30}
-              height={30}
+              width={100}
+              height={100}
               className="cursor-pointer"
             />
             <span className="font-medium text-sm hidden sm:inline">
