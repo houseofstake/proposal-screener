@@ -173,7 +173,7 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
    - **Stakeholders** — RACI matrix listing every required party; every activity must have **exactly one** Accountable
    - **Implementation Plan** — Definition of Done, completion criteria, reporting cadence
    - **Milestones** — table with milestone name, target date, deliverable, success criteria; at least one milestone present
-   - **Budget & Resources** — funding sources and milestone-based distribution if applicable, OR the explicit string "Not applicable."
+   - **Budget & Resources** — funding sources and use of requested resources, OR the explicit string "Not applicable."
    - **Conflict of Interest** — author's statement that they've read and agree with the HoS COI policy, plus disclosure of any conflicts
    - **Copyright** — CC0 1.0 waiver statement
 
