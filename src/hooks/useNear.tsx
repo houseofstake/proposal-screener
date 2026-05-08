@@ -144,7 +144,7 @@ async function ensureInitialized() {
                       : "https://gov.near.org",
                   icons:
                     typeof window !== "undefined"
-                      ? [`${window.location.origin}/near-logo.svg`]
+                      ? [`${window.location.origin}/hos-logo-black.svg`]
                       : [],
                 },
               }

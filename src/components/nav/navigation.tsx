@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNear } from "@/hooks/useNear";
 import { useGovernanceAnalytics } from "@/lib/analytics";
 import { Loader2, LogOut, User } from "lucide-react";
-import NearLogo from "/public/near-logo.svg";
+import NearLogo from "/public/hos-logo-black.svg";
 
 export const Navigation = () => {
   const { signedAccountId, loading, signIn, signOut } = useNear();
@@ -55,8 +55,8 @@ export const Navigation = () => {
               priority
               src={NearLogo}
               alt="NEAR"
-              width={30}
-              height={30}
+              width={100}
+              height={100}
               className="cursor-pointer"
             />
             <span className="font-medium text-sm hidden sm:inline">
