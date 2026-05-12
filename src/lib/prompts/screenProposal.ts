@@ -147,8 +147,8 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
 
    **Frontmatter (per §6.2)** — must include all of:
    - hsp number
-   - title (≤ 44 characters)
-   - description (≤ 140 characters)
+   - title (recommended: ≤ 44 characters)
+   - description (recommended: ≤ 140 characters)
    - author with contact info
    - discussions-to (forum URL)
    - status (one of Draft / Review / Voting / Rejected / Defeated / Final / Living / Vetoed / Withdrawn / Stagnant)
@@ -173,7 +173,7 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
    - **Stakeholders** — RACI matrix listing every required party; every activity must have **exactly one** Accountable
    - **Implementation Plan** — Definition of Done, completion criteria, reporting cadence
    - **Milestones** — table with milestone name, target date, deliverable, success criteria; at least one milestone present
-   - **Budget & Resources** — funding sources and milestone-based distribution if applicable, OR the explicit string "Not applicable."
+   - **Budget & Resources** — funding sources and use of requested resources, OR the explicit string "Not applicable."
    - **Conflict of Interest** — author's statement that they've read and agree with the HoS COI policy, plus disclosure of any conflicts
    - **Copyright** — CC0 1.0 waiver statement
 
@@ -195,7 +195,7 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
    **Pass unless:** Clear contradictions exist. Minor variations or evolving detail across sections do NOT fail.
 
 4. **Compliant** — Adheres to House of Stake norms and the formatting rules in the canonical document:
-   - Frontmatter character limits respected (title ≤ 44, description ≤ 140)
+   - Frontmatter character recommendations followed (title ≤ 44, description ≤ 140)
    - Frontmatter \`status\`, \`track\`, \`type\` use the exact allowed values listed in §6.2
    - RACI matrix has **exactly one Accountable** per activity (per §6.3 Stakeholders)
    - Conflict of Interest section affirms reading the HoS COI policy
@@ -265,9 +265,9 @@ Return evaluation as JSON with this exact structure:
 ### Reason Formatting Requirements
 
 Each "reason" field MUST follow this format:
-- **Maximum 750 characters total**
-- Start with concise summary statement (max 200 characters, no bullet point)
-- Follow with 2-5 supporting bullet points (max 150 characters each)
+- **Recommended maximum: 750 characters total**
+- Start with concise summary statement (recommended: ≤ 200 characters, no bullet point)
+- Follow with 2-5 supporting bullet points (recommended: ≤ 150 characters each)
 - Use proper line breaks between bullets
 
 Example format:
@@ -281,7 +281,7 @@ Summary statement explaining the reason for the score
 Each quality criterion MUST include a "suggestedEdit" field:
 - **When \`pass === false\`:** REQUIRED. Provide a concrete, self-contained markdown snippet the author can paste directly into their draft to address the issue. Reference the exact section name from the Article 6 template ("## Stakeholders", "### Dependencies", "## Budget & Resources", etc.) so the author knows where the snippet belongs. Keep it specific to the proposal in front of you — do not output generic boilerplate.
 - **When \`pass === true\`:** Use an empty string \`""\`. Do not invent improvements when the criterion already passes.
-- **Maximum 1500 characters total** including any markdown.
+- **Recommended maximum: 1500 characters total** including any markdown.
 - Use real numbers, dates, and named items drawn from the proposal where possible. When the proposal omits information needed to draft a fix, leave a placeholder like \`<TBD: total NEAR amount>\` so the author can fill it in.
 
 Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
@@ -299,7 +299,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
 - **Stay objective:** Focus on the criteria, not subjective quality judgments.
 - **Pass when appropriate:** Many proposals legitimately pass — don't artificially raise the bar.
 - **Fail only when necessary:** Block genuinely problematic proposals, not imperfect ones.
-- **Format reasons correctly:** Always follow the 750-char limit with summary + bullets structure.
+- **Format reasons clearly:** Use the summary + bullets structure; aim for ≤ 750 chars.
 
 ## Examples
 
@@ -464,12 +464,12 @@ Carefully evaluate the proposal below against each criterion, deferring to the c
 - Quote contradictions or missing elements
 - Be precise about what passes or fails and where
 - When a failure is driven by a rule from <additional_requirements>, say so explicitly in the reason (e.g., "fails per additional Consistent rule: '<rule text>'")
-- Format all reasons with summary + bullets (max 750 chars)
+- Format all reasons with summary + bullets (aim for ≤ 750 chars)
 
 **Step 4:** Evaluate the attention criteria. **Also apply any rules under \`## Relevant\`, \`## Material\`, and \`## Global / All Criteria\` in <additional_requirements>.**
 - Assess **Relevant** by comparing the proposal's Objective and Outcome (Value Hypothesis) to the four mandate pillars and the Season 1 in-scope themes in the <scope_reference> block. Cite the specific pillar or theme that justifies the score, or — if low — cite the scope item the proposal falls outside of (or the paused / out-of-scope topic it overlaps with).
 - Assess **Material** by considering the magnitude of potential positive or negative impact / risk on NEAR's protocol, treasury, or governance system (high/medium/low).
-- Format reasons with summary + bullets (max 750 chars).
+- Format reasons with summary + bullets (aim for ≤ 750 chars).
 
 **Step 5:** Calculate scores and determine pass/fail:
 - qualityScore: average of quality criteria (1 for pass, 0 for fail)
@@ -478,7 +478,7 @@ Carefully evaluate the proposal below against each criterion, deferring to the c
 
 **Step 6:** Populate \`suggestedEdit\` on every quality criterion:
 - For each criterion where \`pass === false\`, write a concrete markdown snippet the author can paste into their draft. Anchor it to the exact Article 6 section ("## Stakeholders", "### Dependencies", "## Budget & Resources", etc.), reuse the proposal's own numbers, names, and dates wherever possible, and use \`<TBD: ...>\` placeholders only when the proposal genuinely omits the information.
-- Keep each \`suggestedEdit\` self-contained (the author should be able to drop it in without further context) and under 1500 characters.
+- Keep each \`suggestedEdit\` self-contained (the author should be able to drop it in without further context); aim for ≤ 1500 characters.
 - For each criterion where \`pass === true\`, set \`suggestedEdit\` to an empty string \`""\`. Do not invent improvements for criteria that already pass.
 - Attention scores ("relevant", "material") do not get a \`suggestedEdit\` field.
 

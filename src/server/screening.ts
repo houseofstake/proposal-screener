@@ -37,7 +37,9 @@ export class ScreeningError extends Error {
   }
 }
 
-export const MAX_TITLE_LENGTH = 500;
+export const MIN_TITLE_LENGTH = 12;
+export const MAX_TITLE_LENGTH = 255;
+export const MIN_CONTENT_LENGTH = 12;
 export const MAX_CONTENT_LENGTH = 32000;
 const PROMPT_CONTENT_LIMIT = MAX_CONTENT_LENGTH;
 
@@ -55,10 +57,24 @@ export function sanitizeProposalInput(
     throw new ScreeningError(400, "Proposal text is required");
   }
 
+  if (title.trim().length < MIN_TITLE_LENGTH) {
+    throw new ScreeningError(
+      400,
+      `Title too short (min ${MIN_TITLE_LENGTH} characters)`,
+    );
+  }
+
   if (title.length > MAX_TITLE_LENGTH) {
     throw new ScreeningError(
       400,
       `Title too long (max ${MAX_TITLE_LENGTH} characters)`,
+    );
+  }
+
+  if (content.trim().length < MIN_CONTENT_LENGTH) {
+    throw new ScreeningError(
+      400,
+      `Proposal text too short (min ${MIN_CONTENT_LENGTH} characters)`,
     );
   }
 
