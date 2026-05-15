@@ -28,19 +28,23 @@ export default async function handler(
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const authHeader = req.headers.authorization;
-  let verificationResult;
-  try {
-    ({ result: verificationResult } = await verifyNearAuth(authHeader));
-  } catch (error) {
-    return respondWithScreeningError(
-      res,
-      error,
-      "Connect your NEAR wallet to evaluate this proposal."
-    );
+  let nearAddress: string;
+  if (process.env.NODE_ENV === "development") {
+    nearAddress = "dev.near";
+  } else {
+    const authHeader = req.headers.authorization;
+    let verificationResult;
+    try {
+      ({ result: verificationResult } = await verifyNearAuth(authHeader));
+    } catch (error) {
+      return respondWithScreeningError(
+        res,
+        error,
+        "Connect your NEAR wallet to evaluate this proposal."
+      );
+    }
+    nearAddress = verificationResult.accountId;
   }
-
-  const nearAddress = verificationResult.accountId;
 
   // Apply rate limit per NEAR account
   const { allowed, remaining, resetTime } = screenLimiter.check(nearAddress);

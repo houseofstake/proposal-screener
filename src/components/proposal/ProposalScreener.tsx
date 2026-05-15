@@ -87,7 +87,7 @@ export const ProposalScreener = () => {
       setError("Please enter a proposal");
       return;
     }
-    if (!signedAccountId || !wallet) {
+    if (process.env.NODE_ENV !== "development" && (!signedAccountId || !wallet)) {
       setError("Connect your NEAR wallet to screen a proposal");
       return;
     }
@@ -101,17 +101,18 @@ export const ProposalScreener = () => {
     setModel(null);
 
     try {
-      const authToken = await signAuthToken(
-        wallet,
-        `Screen proposal: ${title.slice(0, 80)}`,
-      );
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (process.env.NODE_ENV !== "development") {
+        const authToken = await signAuthToken(
+          wallet,
+          `Screen proposal: ${title.slice(0, 80)}`,
+        );
+        headers["Authorization"] = `Bearer ${authToken}`;
+      }
 
       const response = await fetch("/api/screen", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers,
         body: JSON.stringify({ title, proposal }),
       });
 
@@ -230,7 +231,7 @@ export const ProposalScreener = () => {
   };
 
   const connectDisabled = walletLoading;
-  const screenDisabled = loading || walletLoading || !signedAccountId;
+  const screenDisabled = loading || walletLoading || (process.env.NODE_ENV !== "development" && !signedAccountId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -286,7 +287,7 @@ export const ProposalScreener = () => {
                 </Alert>
               )}
 
-              {!signedAccountId ? (
+              {process.env.NODE_ENV !== "development" && !signedAccountId ? (
                 <Button
                   onClick={() => signIn().catch(() => undefined)}
                   disabled={connectDisabled}
