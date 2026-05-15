@@ -77,6 +77,7 @@ export const ProposalScreener = () => {
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [model, setModel] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [submittedCharCount, setSubmittedCharCount] = useState<number | null>(null);
 
   const evaluateProposal = async () => {
     if (!title.trim()) {
@@ -99,6 +100,7 @@ export const ProposalScreener = () => {
     setVerificationMeta(null);
     setVerificationId(null);
     setModel(null);
+    setSubmittedCharCount(proposal.length);
 
     try {
       const authToken = await signAuthToken(
@@ -363,6 +365,12 @@ export const ProposalScreener = () => {
                           <strong>Attention:</strong>{" "}
                           {formatScore(result.attentionScore)}
                         </div>
+                        {submittedCharCount !== null && (
+                          <div className="flex items-center gap-1">
+                            <strong>Characters:</strong>{" "}
+                            {submittedCharCount.toLocaleString()}
+                          </div>
+                        )}
                         {submissionId && (
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <span>ID:</span>
