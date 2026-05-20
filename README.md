@@ -175,7 +175,8 @@ src/
 
 - [NEAR AI Cloud](https://near.ai)
 - [NEP-413 (off-chain wallet signing)](https://github.com/near/NEPs/blob/master/neps/nep-0413.md)
-- [HSP-001 governance proposal template](https://github.com/near/governance)
+- [House of Stake Proposal and Voting Procedures (Constitutional Docs, Proposal Requirements)](https://github.com/houseofstake/proposals/blob/main/HSPs/hsp-009-pvp.md)
+- [Proposal and Voting Guide](https://houseofstake.org/docs/get-involved/submit-a-proposal)
 
 ## License
 
