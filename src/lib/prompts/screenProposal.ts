@@ -147,8 +147,8 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
 
    **Frontmatter (per §6.2)** — must include all of:
    - hsp number
-   - title (recommended: ≤ 44 characters)
-   - description (recommended: ≤ 140 characters)
+   - title
+   - description
    - author with contact info
    - discussions-to (forum URL)
    - status (one of Draft / Review / Voting / Rejected / Defeated / Final / Living / Vetoed / Withdrawn / Stagnant)
@@ -170,7 +170,7 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
    - **Technical Specification** — sufficient for reviewers to assess feasibility and correctness
    - **Backwards Compatibility** — whether the proposal conflicts with existing rules/systems and how those conflicts are resolved
    - **Security Considerations** — risks plus mitigations, OR the explicit string "No security considerations identified."
-   - **Stakeholders** — RACI matrix listing every required party; every activity must have **exactly one** Accountable
+   - **RACI matrix** — listing every required party with **exactly one** Accountable per activity; may appear in any section of the proposal (not required to be in **## Stakeholders**)
    - **Implementation Plan** — Definition of Done, completion criteria, reporting cadence
    - **Milestones** — table with milestone name, target date, deliverable, success criteria; at least one milestone present
    - **Budget & Resources** — funding sources and use of requested resources, OR the explicit string "Not applicable."
@@ -195,9 +195,8 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
    **Pass unless:** Clear contradictions exist. Minor variations or evolving detail across sections do NOT fail.
 
 4. **Compliant** — Adheres to House of Stake norms and the formatting rules in the canonical document:
-   - Frontmatter character recommendations followed (title ≤ 44, description ≤ 140)
    - Frontmatter \`status\`, \`track\`, \`type\` use the exact allowed values listed in §6.2
-   - RACI matrix has **exactly one Accountable** per activity (per §6.3 Stakeholders)
+   - RACI matrix present somewhere in the proposal with **exactly one Accountable** per activity
    - Conflict of Interest section affirms reading the HoS COI policy
    - Copyright section waives via CC0 1.0
    - Professional, respectful tone; no personal attacks, discrimination, or inflammatory language
@@ -308,7 +307,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
 {
   "complete": {
     "pass": true,
-    "reason": "All Article 6 frontmatter and body sections present\\n- Frontmatter complete: hsp, title (38 chars), description (118 chars), track=Decision, type=Simple Majority\\n- Abstract under 120 words; Context, Problem, Approach all populated\\n- Value Hypothesis with Objective, Outcome, Dependencies\\n- KPIs, Technical Spec, Backwards Compatibility, Security Considerations, RACI, Implementation Plan, Milestones, Budget, COI, CC0 all present",
+    "reason": "All Article 6 frontmatter and body sections present\\n- Frontmatter complete: hsp, title, description, track=Decision, type=Simple Majority\\n- Abstract under 120 words; Context, Problem, Approach all populated\\n- Value Hypothesis with Objective, Outcome, Dependencies\\n- KPIs, Technical Spec, Backwards Compatibility, Security Considerations, RACI, Implementation Plan, Milestones, Budget, COI, CC0 all present",
     "suggestedEdit": ""
   },
   "legible": {
@@ -323,7 +322,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
   },
   "compliant": {
     "pass": true,
-    "reason": "Meets Article 6 formatting and conduct requirements\\n- Frontmatter limits respected (title 38/44, description 118/140)\\n- track/type values match allowed enum\\n- RACI has exactly one Accountable per activity\\n- COI policy referenced, CC0 1.0 waiver present",
+    "reason": "Meets Article 6 formatting and conduct requirements\\n- Frontmatter valid: track=Decision, type=Simple Majority match allowed enums\\n- RACI has exactly one Accountable per activity\\n- COI policy referenced, CC0 1.0 waiver present",
     "suggestedEdit": ""
   },
   "justified": {
@@ -456,7 +455,7 @@ Carefully evaluate the proposal below against each criterion, deferring to the c
 **Step 2:** Check completeness against Article 6 (§6.2 frontmatter and §6.3 body), **then check the \`## Complete\` and \`## Global / All Criteria\` sections of <additional_requirements>** and apply any rules there:
 - List which frontmatter fields are present and which are missing or malformed
 - List which body sections are present and which are missing
-- Note where a section exists but lacks required sub-elements (e.g., Stakeholders without a RACI table, Milestones without success criteria, Value Hypothesis missing the Dependencies subsection)
+- Note where a section exists but lacks required sub-elements (e.g., no RACI table anywhere in the proposal, Milestones without success criteria, Value Hypothesis missing the Dependencies subsection)
 - Apply any additional Complete-specific rules from <additional_requirements>
 
 **Step 3:** Evaluate the remaining quality criteria. **For each criterion C, also apply every bullet under the matching \`## C\` heading inside <additional_requirements>, plus every bullet under \`## Global / All Criteria\`.**

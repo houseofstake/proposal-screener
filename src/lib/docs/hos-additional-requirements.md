@@ -54,7 +54,7 @@ _Additional internal-coherence requirements._
 
 _Additional formatting, conduct, or HoS-norm requirements beyond §6.2 / §6.3._
 
-- _(none yet)_
+**RACI placement** _(added 2026-05-15)_. The RACI matrix may appear in any section of the proposal. It is not required to be in **## Stakeholders**. Fail only if no RACI matrix is present anywhere in the proposal.
 
 ## Justified
 
@@ -84,6 +84,8 @@ _Additional impact / risk-magnitude rules._
 ---
 
 ## Notes / Discussion (non-binding)
+
+**Frontmatter title/description character limits removed** _(added 2026-05-15)_. The Article 6 template previously specified a maximum of 44 characters for the frontmatter `title` field and 140 characters for the `description` field. These limits were a technical constraint of the 2025 voting system and no longer apply. Do not flag proposals for exceeding these lengths.
 
 _Use this section for context, rationale, or links that inform the rules above but should NOT be enforced as standalone requirements. The agent treats this section as informational only._
 
