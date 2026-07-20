@@ -30,6 +30,8 @@ The following patterns are not acceptable:
 
 ## Complete
 
+**HSP number and forum link not required** _(added 2026-05-15)_. The `hsp` number and `discussions-to` forum URL fields are no longer required for evaluation. After the product re-launch, both are automatically assigned when a proposal is submitted at houseofstake.org. Do not fail a proposal for omitting either field.
+
 **Mechanisms Specification** _(added 2026-05-07)_. All mechanisms included in a proposal must be fully and unambiguously specified to enable implementation.
 
 Any calculations (e.g., performance criteria for rewards) must include:

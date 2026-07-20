@@ -146,11 +146,9 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
 1. **Complete** — Includes every Article 6 mandatory element. Concretely:
 
    **Frontmatter (per §6.2)** — must include all of:
-   - hsp number
    - title
    - description
    - author with contact info
-   - discussions-to (forum URL)
    - status (one of Draft / Review / Voting / Rejected / Defeated / Final / Living / Vetoed / Withdrawn / Stagnant)
    - track (Sensing or Decision)
    - type (Simple Majority or Supermajority)
