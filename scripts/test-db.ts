@@ -35,6 +35,7 @@ const testEvaluation: Evaluation = {
   compliant: { pass: true, reason: "Test compliant" },
   justified: { pass: true, reason: "Test justified" },
   measurable: { pass: true, reason: "Test measurable" }, // NEW
+  constitutional: { pass: true, reason: "Test constitutional" },
 
   // Attention scores
   relevant: { score: "high", reason: "Test relevant" }, // NEW
