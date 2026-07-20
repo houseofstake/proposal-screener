@@ -19,6 +19,8 @@ const HOS_ADDITIONAL_REQUIREMENTS_PATH = path.join(
   "hos-additional-requirements.md"
 );
 
+const CONSTITUTIONAL_DOCS_DIR = path.join(DOCS_DIR, "constitutional_docs");
+
 function loadDoc(filePath: string, label: string, fallback: string): string {
   try {
     return fs.readFileSync(filePath, "utf8");
@@ -29,6 +31,39 @@ function loadDoc(filePath: string, label: string, fallback: string): string {
     );
     return fallback;
   }
+}
+
+/**
+ * Loads every file in src/lib/docs/constitutional_docs/ (the Constitution,
+ * Bylaws, Memorandum of Association, Code of Conduct, Conflict of Interest
+ * Policy, Mission Vision Values, Proposals and Voting Procedures, Screening
+ * Committee Charter, etc.). Adding or removing a file in that directory is
+ * sufficient to change what the agent checks proposals against — no code
+ * changes required.
+ */
+function loadConstitutionalDocs(): { label: string; content: string }[] {
+  let filenames: string[];
+  try {
+    filenames = fs
+      .readdirSync(CONSTITUTIONAL_DOCS_DIR)
+      .filter((filename) => /\.(txt|md)$/i.test(filename));
+  } catch (error) {
+    console.error(
+      `[screenProposal] Failed to list constitutional docs directory at ${CONSTITUTIONAL_DOCS_DIR}:`,
+      error
+    );
+    return [];
+  }
+
+  return filenames.sort().map((filename) => {
+    const label = filename.replace(/\.(txt|md)$/i, "");
+    const content = loadDoc(
+      path.join(CONSTITUTIONAL_DOCS_DIR, filename),
+      `constitutional doc "${label}"`,
+      `[Constitutional document "${label}" failed to load.]`
+    );
+    return { label, content };
+  });
 }
 
 const HSP_REQUIREMENTS_DOC = loadDoc(
@@ -55,6 +90,15 @@ const HOS_ADDITIONAL_REQUIREMENTS_DOC = loadDoc(
   "[House of Stake additional-requirements living document failed to load — proceed using the canonical Article 6 and Season 1 references only.]"
 );
 
+const CONSTITUTIONAL_DOCS = loadConstitutionalDocs();
+
+const CONSTITUTIONAL_DOCS_BLOCK =
+  CONSTITUTIONAL_DOCS.length > 0
+    ? CONSTITUTIONAL_DOCS.map(
+        (doc) => `--- BEGIN: ${doc.label} ---\n${doc.content}\n--- END: ${doc.label} ---`
+      ).join("\n\n")
+    : "[No constitutional documents were found — skip the Constitutional criterion's document-specific checks and note this in the reason.]";
+
 /**
  * Generates the AI screening prompt for House of Stake governance proposals.
  *
@@ -76,10 +120,18 @@ const HOS_ADDITIONAL_REQUIREMENTS_DOC = loadDoc(
  *      whose H2 heading it lives, and rules under "Global / All Criteria" apply
  *      to every criterion.
  *
+ *   4. <constitutional_docs>     — every file in src/lib/docs/constitutional_docs/
+ *      (Constitution, Bylaws, Memorandum of Association, Code of Conduct,
+ *      Conflict of Interest Policy, Mission Vision Values, Proposals and Voting
+ *      Procedures, Screening Committee Charter, etc.). Authoritative for the
+ *      "Constitutional" quality criterion — whether the proposal conflicts with
+ *      House of Stake's governing documents.
+ *
  * Where the in-prompt summary disagrees with any embedded reference, the
  * embedded reference wins. Where references conflict with each other, defer to
- * <hsp_requirements> for structural questions and to <scope_reference> for
- * scope / relevance questions; <additional_requirements> stacks on top of both.
+ * <hsp_requirements> for structural questions, <scope_reference> for scope /
+ * relevance questions, and <constitutional_docs> for governance-authority
+ * questions; <additional_requirements> stacks on top of all three.
  *
  * @param title   Proposal title (already sanitized).
  * @param content Proposal body (already sanitized).
@@ -137,9 +189,19 @@ The document inside the <additional_requirements> block below is a **living docu
 ${HOS_ADDITIONAL_REQUIREMENTS_DOC}
 </additional_requirements>
 
+### 4. Constitutional Reference
+
+The documents inside the <constitutional_docs> block below are House of Stake's governing documents: the Constitution, Bylaws, Memorandum of Association, Code of Conduct, Conflict of Interest Policy, Mission Vision Values, Proposals and Voting Procedures, and Screening Committee Charter. This block is the **authoritative source of truth for the "Constitutional" quality criterion** — whether a proposal conflicts with, exceeds, or attempts to override the roles, authorities, processes, or restrictions these documents define.
+
+Where these documents conflict with each other, the Foundation Legal Documents (Bylaws, Memorandum of Association) prevail over the Constitution and policy documents, per the Constitution's own stated hierarchy.
+
+<constitutional_docs>
+${CONSTITUTIONAL_DOCS_BLOCK}
+</constitutional_docs>
+
 ## Screening Criteria
 
-Evaluate the proposal against ALL six quality criteria and two attention criteria. The criteria are anchored to Article 6 sections — when in doubt, defer to the canonical document above.
+Evaluate the proposal against ALL seven quality criteria and two attention criteria. The criteria are anchored to Article 6 sections and the constitutional documents — when in doubt, defer to the canonical documents above.
 
 ### Quality Score Criteria
 
@@ -218,9 +280,15 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
 
    **Pass if:** At least one concrete metric is specified. **Block if:** Only vague qualitative statements with no quantifiable measures appear in the KPIs and Milestones sections.
 
+7. **Constitutional** — Does not conflict with House of Stake's governing documents (per the <constitutional_docs> block above: Constitution, Bylaws, Memorandum of Association, Code of Conduct, Conflict of Interest Policy, Mission Vision Values, Proposals and Voting Procedures, Screening Committee Charter). A proposal passes this criterion if **either**:
+   - (a) it does not conflict with, exceed, or attempt to override the roles, authorities, processes, or restrictions any of these documents define (e.g., it doesn't purport to bind a body beyond its charter, bypass a required approval step, or grant itself authority the Constitution reserves elsewhere); **or**
+   - (b) it explicitly proposes to establish or amend a Constitutional Document, and does so through the proper process: frontmatter \`type: Supermajority\` (per PVP §3.4.2 — proposals that create, modify, or enable the governance system itself require a Supermajority vote) and consistency with the establishment/amendment process in PVP Article 5.
+
+   **Block if:** The proposal would enact or require something that directly conflicts with, or is ultra vires (beyond the authority granted by), one of the constitutional documents — **and** it is not itself a properly-processed amendment to that document (i.e., not case (b) above, for example a proposal that conflicts with the Constitution but is filed as Simple Majority rather than Supermajority, or that otherwise skips the Article 5 process). A proposal merely silent on constitutional matters, or one that operates in a space the constitutional documents don't address, does NOT fail. When blocking, cite the specific document and article/section that the proposal conflicts with.
+
 ### Attention Score Criteria
 
-7. **Relevant** — Alignment with the House of Stake Season 1 mandate (per the <scope_reference> block above). House of Stake's mandate is to act as NEAR's Treasury Governance Engine, focused on economic policy, treasury oversight, and key tokenomics decisions. Score relevance against the four pillars (Value Accrual, Sustainable Allocation, Aligned Decision-Making, Defining Economic Policy) and the explicit Season 1 in-scope themes:
+8. **Relevant** — Alignment with the House of Stake Season 1 mandate (per the <scope_reference> block above). House of Stake's mandate is to act as NEAR's Treasury Governance Engine, focused on economic policy, treasury oversight, and key tokenomics decisions. Score relevance against the four pillars (Value Accrual, Sustainable Allocation, Aligned Decision-Making, Defining Economic Policy) and the explicit Season 1 in-scope themes:
 
    - Value Capture & Inflation Optimization
    - Expansion of ecosystem value accrual initiatives
@@ -237,7 +305,7 @@ Evaluate the proposal against ALL six quality criteria and two attention criteri
 
    When citing the basis for your score, name the specific pillar or in-scope theme from the scope reference (e.g., "aligns with 'Value Capture & Inflation Optimization'") rather than asserting general NEAR relevance.
 
-8. **Material** — Magnitude of potential positive or negative impact and/or risk.
+9. **Material** — Magnitude of potential positive or negative impact and/or risk.
    - **High:** Major protocol or token-economic changes; very large grants; multi-year commitments.
    - **Medium:** Moderate protocol upgrades; mid-sized grants; operational changes with bounded risk.
    - **Low:** Minor parameter tweaks; small grants; routine administrative or housekeeping actions.
@@ -253,6 +321,7 @@ Return evaluation as JSON with this exact structure:
   "compliant":  {"pass": boolean, "reason": "string", "suggestedEdit": "string"},
   "justified":  {"pass": boolean, "reason": "string", "suggestedEdit": "string"},
   "measurable": {"pass": boolean, "reason": "string", "suggestedEdit": "string"},
+  "constitutional": {"pass": boolean, "reason": "string", "suggestedEdit": "string"},
   "relevant":   {"score": "high" | "medium" | "low", "reason": "string"},
   "material":   {"score": "high" | "medium" | "low", "reason": "string"},
   "qualityScore": number,
@@ -287,9 +356,9 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
 
 ### Score Calculations
 
-- **qualityScore**: Average of all quality criteria pass rates (complete, legible, consistent, compliant, justified, measurable). Convert pass/fail to 1/0, then calculate mean.
+- **qualityScore**: Average of all quality criteria pass rates (complete, legible, consistent, compliant, justified, measurable, constitutional). Convert pass/fail to 1/0, then calculate mean.
 - **attentionScore**: Average of relevant and material scores. Convert high/medium/low to 1/0.5/0, then calculate mean.
-- **overallPass**: true if and only if ALL six quality criteria pass.
+- **overallPass**: true if and only if ALL seven quality criteria pass.
 
 ## Important Guidelines
 
@@ -335,6 +404,11 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
     "reason": "Concrete success criteria defined\\n- KPIs section: 500 active users in 6 months, 50% reduction in onboarding time\\n- Milestone success criteria filled in for all 3 milestones\\n- Definition of Done references KPI targets",
     "suggestedEdit": ""
   },
+  "constitutional": {
+    "pass": true,
+    "reason": "No conflict with governing documents\\n- Does not modify voting thresholds, proposal types, or any authority reserved to another body\\n- No amendment to a Constitutional Document proposed, so the Supermajority amendment path does not apply\\n- No Conflict of Interest Policy or Code of Conduct concerns raised",
+    "suggestedEdit": ""
+  },
   "relevant": {
     "score": "medium",
     "reason": "Adjacent to the Season 1 mandate but not core to economic policy\\n- Improves NEAR developer experience but does not advance Value Capture, Inflation Optimization, or NEAR-native asset monetization\\n- No direct effect on protocol revenues, emissions, or treasury parameters\\n- Supports ecosystem health indirectly via dApp pipeline rather than the four mandate pillars"
@@ -346,7 +420,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
   "qualityScore": 1.0,
   "attentionScore": 0.5,
   "overallPass": true,
-  "summary": "Proposes NEAR IDE plugin to reduce developer onboarding from 2 weeks to 1 week through autocomplete and debugging tools. Passes all six quality criteria with a complete Article 6 structure, realistic technical approach, itemised $150k budget, and KPIs targeting 500 active users. Adjacent rather than core to the Season 1 Treasury Governance Engine mandate — to lift relevance, the author could tie the work back to one of the four pillars (e.g., demonstrate how stronger developer onboarding feeds Value Accrual via increased on-chain activity)."
+  "summary": "Proposes NEAR IDE plugin to reduce developer onboarding from 2 weeks to 1 week through autocomplete and debugging tools. Passes all seven quality criteria with a complete Article 6 structure, realistic technical approach, itemised $150k budget, and KPIs targeting 500 active users. Adjacent rather than core to the Season 1 Treasury Governance Engine mandate — to lift relevance, the author could tie the work back to one of the four pillars (e.g., demonstrate how stronger developer onboarding feeds Value Accrual via increased on-chain activity)."
 }
 
 **Example 2 — Failed Quality (Inconsistent, Measurable missing) — suggestedEdit only on the failing criteria:**
@@ -382,6 +456,11 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
     "reason": "KPIs and Milestones success-criteria are too vague\\n- KPIs section says 'broad adoption' with no number\\n- Milestones success-criteria column is empty for M2 and M3\\n- Definition of Done references 'positive feedback' rather than a metric",
     "suggestedEdit": "Replace the **## Key Performance Indicators (KPIs)** section with concrete targets, and fill in the success-criteria column in the Milestones table:\\n\\n## Key Performance Indicators (KPIs)\\n- Adoption: ≥ 300 unique developers run the test runner against a NEAR contract within 6 months of M3.\\n- Quality: ≥ 50 contract bugs reported via the tool within 6 months of M3.\\n- Reliability: < 1% false-positive rate on a curated benchmark suite.\\n\\n| Milestone | Target | Deliverable | Success criteria |\\n|---|---|---|---|\\n| M1 Test runner | <TBD: M+3> | CLI + sample suite | Passes 100% of NEAR SDK example tests |\\n| M2 Gas profiler | <TBD: M+6> | Profiler module | Reports gas to ±5% of on-chain reality on 20 sample contracts |\\n| M3 CI integration | <TBD: M+9> | GitHub Action | Used by ≥ 10 NEAR projects in CI |"
   },
+  "constitutional": {
+    "pass": true,
+    "reason": "No conflict with governing documents\\n- Does not touch voting thresholds, proposal types, or reserved authorities\\n- No amendment to a Constitutional Document proposed\\n- No Conflict of Interest Policy or Code of Conduct concerns raised",
+    "suggestedEdit": ""
+  },
   "relevant": {
     "score": "low",
     "reason": "Outside the Season 1 Treasury Governance Engine mandate\\n- Smart-contract testing tool does not advance any of the four pillars (Value Accrual, Sustainable Allocation, Aligned Decision-Making, Defining Economic Policy)\\n- Not on the Season 1 in-scope theme list (no Value Capture, NEAR-native asset, or emissions / fee impact)\\n- Useful developer tooling, but a fit for a different funding venue rather than HoS in Season #1"
@@ -390,7 +469,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
     "score": "low",
     "reason": "Limited potential impact given proposal issues\\n- Small-to-medium grant\\n- Tooling layer (not protocol-level)\\n- Internal contradictions suggest low execution confidence"
   },
-  "qualityScore": 0.5,
+  "qualityScore": 0.57,
   "attentionScore": 0.5,
   "overallPass": false,
   "summary": "Proposes a smart-contract testing tool for NEAR developers. Fails screening due to inconsistencies, weak justification, and missing measurable success criteria. To pass: (1) reconcile budget across sections, (2) align timeline between Approach, Implementation Plan, and Milestones, (3) tie team size and rate to the budget in Implementation Plan, and (4) add concrete KPIs and per-milestone success criteria. Note: developer tooling sits outside the Season 1 Treasury Governance Engine mandate; even if quality issues are fixed, the author should consider whether HoS is the right venue or reframe the proposal around an explicit economic-policy outcome."
@@ -429,6 +508,11 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
     "reason": "Quantifiable targets in KPIs and Milestones\\n- 10,000 users target\\n- $5M TVL target\\n- All milestone success-criteria columns populated",
     "suggestedEdit": ""
   },
+  "constitutional": {
+    "pass": true,
+    "reason": "No conflict with governing documents\\n- Does not touch voting thresholds, proposal types, or reserved authorities\\n- No amendment to a Constitutional Document proposed\\n- No Conflict of Interest Policy or Code of Conduct concerns raised",
+    "suggestedEdit": ""
+  },
   "relevant": {
     "score": "low",
     "reason": "Outside the Season 1 Treasury Governance Engine mandate\\n- XYZ Swap is an Ethereum-based protocol; benefits accrue to a competing ecosystem\\n- No advancement of the four pillars (Value Accrual, Sustainable Allocation, Aligned Decision-Making, Defining Economic Policy)\\n- Not aligned with any Season 1 in-scope theme (no Value Capture, NEAR-native asset, or emissions / fee outcome)\\n- Treasury allocation outside HoS scope"
@@ -440,7 +524,7 @@ Attention scores ("relevant", "material") do NOT have a \`suggestedEdit\` field.
   "qualityScore": 1.0,
   "attentionScore": 0.25,
   "overallPass": true,
-  "summary": "Proposes a marketing campaign for the Ethereum-based DeFi protocol XYZ Swap. Passes all six Article 6 quality criteria but falls outside the House of Stake Season 1 Treasury Governance Engine mandate — no advancement of the four pillars and no listed in-scope theme. To bring this within scope, the author would need to reframe the proposal around a concrete NEAR economic-policy outcome (e.g., NEAR-native deployment driving Value Accrual, or a protocol-revenue mechanism) in the **## End-to-end Value Hypothesis** Outcome and Dependencies subsections."
+  "summary": "Proposes a marketing campaign for the Ethereum-based DeFi protocol XYZ Swap. Passes all seven quality criteria but falls outside the House of Stake Season 1 Treasury Governance Engine mandate — no advancement of the four pillars and no listed in-scope theme. To bring this within scope, the author would need to reframe the proposal around a concrete NEAR economic-policy outcome (e.g., NEAR-native deployment driving Value Accrual, or a protocol-revenue mechanism) in the **## End-to-end Value Hypothesis** Outcome and Dependencies subsections."
 }
 
 ## Now Evaluate
@@ -465,23 +549,29 @@ Carefully evaluate the proposal below against each criterion, deferring to the c
 - When a failure is driven by a rule from <additional_requirements>, say so explicitly in the reason (e.g., "fails per additional Consistent rule: '<rule text>'")
 - Format all reasons with summary + bullets (aim for ≤ 750 chars)
 
-**Step 4:** Evaluate the attention criteria. **Also apply any rules under \`## Relevant\`, \`## Material\`, and \`## Global / All Criteria\` in <additional_requirements>.**
+**Step 4:** Evaluate the **Constitutional** criterion against the <constitutional_docs> block:
+- Identify any requested action, authority, or process in the proposal that touches governance mechanics, roles, or authorities defined in the Constitution, Bylaws, Memorandum of Association, Code of Conduct, Conflict of Interest Policy, Mission Vision Values, Proposals and Voting Procedures, or Screening Committee Charter
+- Check whether that action is consistent with, silent on, or in direct conflict with those documents
+- Only fail if there is an affirmative conflict — cite the specific document and article/section number
+- Format the reason with summary + bullets (aim for ≤ 750 chars)
+
+**Step 5:** Evaluate the attention criteria. **Also apply any rules under \`## Relevant\`, \`## Material\`, and \`## Global / All Criteria\` in <additional_requirements>.**
 - Assess **Relevant** by comparing the proposal's Objective and Outcome (Value Hypothesis) to the four mandate pillars and the Season 1 in-scope themes in the <scope_reference> block. Cite the specific pillar or theme that justifies the score, or — if low — cite the scope item the proposal falls outside of (or the paused / out-of-scope topic it overlaps with).
 - Assess **Material** by considering the magnitude of potential positive or negative impact / risk on NEAR's protocol, treasury, or governance system (high/medium/low).
 - Format reasons with summary + bullets (aim for ≤ 750 chars).
 
-**Step 5:** Calculate scores and determine pass/fail:
+**Step 6:** Calculate scores and determine pass/fail:
 - qualityScore: average of quality criteria (1 for pass, 0 for fail)
 - attentionScore: average of attention criteria (1 for high, 0.5 for medium, 0 for low)
-- overallPass: true only if ALL six quality criteria pass
+- overallPass: true only if ALL seven quality criteria pass
 
-**Step 6:** Populate \`suggestedEdit\` on every quality criterion:
-- For each criterion where \`pass === false\`, write a concrete markdown snippet the author can paste into their draft. Anchor it to the exact Article 6 section ("## Stakeholders", "### Dependencies", "## Budget & Resources", etc.), reuse the proposal's own numbers, names, and dates wherever possible, and use \`<TBD: ...>\` placeholders only when the proposal genuinely omits the information.
+**Step 7:** Populate \`suggestedEdit\` on every quality criterion:
+- For each criterion where \`pass === false\`, write a concrete markdown snippet the author can paste into their draft. Anchor it to the exact Article 6 section ("## Stakeholders", "### Dependencies", "## Budget & Resources", etc.), reuse the proposal's own numbers, names, and dates wherever possible, and use \`<TBD: ...>\` placeholders only when the proposal genuinely omits the information. For a failing **Constitutional** criterion, anchor the snippet to the proposal section that needs to change to remove the conflict, and name the constitutional document/article it must align with.
 - Keep each \`suggestedEdit\` self-contained (the author should be able to drop it in without further context); aim for ≤ 1500 characters.
 - For each criterion where \`pass === true\`, set \`suggestedEdit\` to an empty string \`""\`. Do not invent improvements for criteria that already pass.
 - Attention scores ("relevant", "material") do not get a \`suggestedEdit\` field.
 
-**Step 7:** Write a constructive summary:
+**Step 8:** Write a constructive summary:
 - Sentence 1: What the proposal aims to do
 - Sentence 2: Pass/fail with primary reason
 - Sentence 3: If fail, specific improvements needed with section names; if pass, key strengths
