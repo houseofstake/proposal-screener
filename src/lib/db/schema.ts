@@ -19,7 +19,7 @@ import type { Evaluation } from "@/types/evaluation";
  * or external forum topics — every paste-and-screen produces a fresh row.
  *
  * The evaluation JSON contains:
- * - 6 quality criteria (complete, legible, consistent, compliant, justified, measurable)
+ * - 7 quality criteria (complete, legible, consistent, compliant, justified, measurable, constitutional)
  *   each with `pass`, `reason`, and `suggestedEdit`
  * - 2 attention scores (relevant, material) with `score` + `reason`
  * - Computed scores (qualityScore, attentionScore) and `overallPass`

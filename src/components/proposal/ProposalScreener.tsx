@@ -36,7 +36,8 @@ type QualityKey =
   | "consistent"
   | "compliant"
   | "justified"
-  | "measurable";
+  | "measurable"
+  | "constitutional";
 
 const QUALITY_LABELS: Record<QualityKey, string> = {
   complete: "Complete",
@@ -45,6 +46,7 @@ const QUALITY_LABELS: Record<QualityKey, string> = {
   compliant: "Compliant",
   justified: "Justified",
   measurable: "Measurable",
+  constitutional: "Constitutional",
 };
 
 /**

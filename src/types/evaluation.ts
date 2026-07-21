@@ -18,13 +18,14 @@ export interface AttentionScore {
 }
 
 export interface Evaluation {
-  // Quality Score Criteria (6 criteria)
+  // Quality Score Criteria (7 criteria)
   complete: EvaluationCriterion;
   legible: EvaluationCriterion;
   consistent: EvaluationCriterion;
   compliant: EvaluationCriterion;
   justified: EvaluationCriterion;
   measurable: EvaluationCriterion;
+  constitutional: EvaluationCriterion;
 
   // Attention Score Criteria (2 criteria)
   relevant: AttentionScore;
