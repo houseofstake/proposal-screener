@@ -1,6 +1,6 @@
 # House of Stake Proposal Screening — Additional Requirements (Living Document)
 
-> **This file is a living document.** Add new screening rules here as House of Stake's expectations evolve. Anything written under a category heading below is treated as **binding** by the screening agent, on equal footing with the canonical Article 6 requirements and the Season 1 scope reference.
+> **This file is a living document.** Add new screening rules here as House of Stake's expectations evolve. Anything written under a category heading below is treated as **binding** by the screening agent, on equal footing with the canonical Article 6 requirements, the Season 1 scope reference, and the constitutional documents.
 
 ## How to use this file
 
@@ -39,6 +39,12 @@ a) A concise plain-language description of the logic and intent
 b) The exact mathematical formula required for implementation
 c) A complete definition of all variables and parameters used in the formula\
 
+**Frontmatter author — identification vs. contact info** _(added 2026-08-26)_. The frontmatter `author` field (§6.2) must identify the author with either their legal name, or a pseudonym / forum username specific and consistent enough to clearly identify them (e.g., matches their forum profile or prior HoS submissions). Publishing contact details (email, Telegram, etc.) directly in the frontmatter is NOT a hard requirement. Fail this field only if:
+- No legal name or identifying pseudonym/username is given at all (e.g., "Anonymous", a generic team name with no linked individual), OR
+- There is no indication anywhere in the proposal of a way for House of Stake and the stakeholders involved in executing the proposal to reach the author (a forum profile link, an email, a handle, "reachable via the HoS forum thread," etc.)
+
+Do not fail solely because the contact channel is not a published email/phone number — a forum username or other identifying handle that HoS can use to reach the author satisfies this.
+
 ## Legible
 
 _Additional clarity / readability requirements._
@@ -58,6 +64,8 @@ _Additional formatting, conduct, or HoS-norm requirements beyond §6.2 / §6.3._
 
 **RACI placement** _(added 2026-05-15)_. The RACI matrix may appear in any section of the proposal. It is not required to be in **## Stakeholders**. Fail only if no RACI matrix is present anywhere in the proposal.
 
+**Frontmatter category — multiple values allowed** _(added 2026-08-26)_. The frontmatter `category` field (§6.2) may list one or several of the valid categories (Economic Governance, Technical Governance, Legitimacy & Engagement, Grants & Funding, Operations, Other). Do not flag a proposal solely for listing more than one category. Fail only if the field is missing entirely, or if it lists a value that is not one of the categories above.
+
 ## Justified
 
 _Additional logical-chain requirements._
@@ -68,6 +76,12 @@ _Additional logical-chain requirements._
 ## Measurable
 
 _Additional KPI / success-criteria requirements._
+
+- _(none yet)_
+
+## Constitutional
+
+_Additional rules on consistency with House of Stake's governing documents (constitutional docs)._
 
 - _(none yet)_
 
