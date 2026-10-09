@@ -1,4 +1,5 @@
 import { buildScreeningPrompt } from "@/lib/prompts/screenProposal";
+import { NotAuthorizedError } from "@/server/accessControl";
 import type { VerificationMetadata } from "@/types/agui-events";
 import type { Evaluation } from "@/types/evaluation";
 import {
@@ -11,6 +12,7 @@ import {
   type VerifyOptions,
 } from "near-sign-verify";
 import type { NextApiResponse } from "next";
+import { z } from "zod";
 
 type ScreeningErrorDetails = {
   code?: string;
@@ -144,6 +146,106 @@ export async function verifyNearAuth(
   }
 }
 
+export const QUALITY_KEYS = [
+  "complete",
+  "legible",
+  "consistent",
+  "compliant",
+  "justified",
+  "measurable",
+  "constitutional",
+] as const;
+
+const ATTENTION_WEIGHTS = { high: 1, medium: 0.5, low: 0 } as const;
+
+const criterionSchema = z.object({
+  pass: z.boolean(),
+  reason: z.string(),
+  suggestedEdit: z.string().optional().default(""),
+});
+
+const attentionSchema = z.object({
+  // Models occasionally capitalise the enum ("High"); normalise before checking.
+  score: z
+    .string()
+    .transform((value) => value.trim().toLowerCase())
+    .pipe(z.enum(["high", "medium", "low"])),
+  reason: z.string(),
+});
+
+/**
+ * Shape the model must return. The model's own qualityScore / attentionScore /
+ * overallPass are deliberately not part of the schema: they are dropped and
+ * recomputed from the per-criterion results so a model arithmetic slip (or a
+ * prompt-injected "overallPass": true) can't disagree with the criteria.
+ */
+const modelEvaluationSchema = z.object({
+  complete: criterionSchema,
+  legible: criterionSchema,
+  consistent: criterionSchema,
+  compliant: criterionSchema,
+  justified: criterionSchema,
+  measurable: criterionSchema,
+  constitutional: criterionSchema,
+  relevant: attentionSchema,
+  material: attentionSchema,
+  summary: z.string(),
+});
+
+type ModelEvaluation = z.infer<typeof modelEvaluationSchema>;
+
+export function computeEvaluationScores(
+  evaluation: ModelEvaluation,
+): Pick<Evaluation, "qualityScore" | "attentionScore" | "overallPass"> {
+  const passed = QUALITY_KEYS.filter((key) => evaluation[key].pass).length;
+  const attentionScore =
+    (ATTENTION_WEIGHTS[evaluation.relevant.score] +
+      ATTENTION_WEIGHTS[evaluation.material.score]) /
+    2;
+
+  return {
+    qualityScore: passed / QUALITY_KEYS.length,
+    attentionScore,
+    overallPass: passed === QUALITY_KEYS.length,
+  };
+}
+
+/**
+ * Extracts the JSON object from the model's reply, validates it against the
+ * evaluation schema, and fills in server-computed scores.
+ */
+export function parseEvaluation(contentText: string): Evaluation {
+  const jsonMatch = contentText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new ScreeningError(502, "Could not parse evaluation response");
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    throw new ScreeningError(502, "Could not parse evaluation response", {
+      code: "invalid_json",
+      details: error instanceof Error ? error.message : undefined,
+    });
+  }
+
+  const parsed = modelEvaluationSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error(
+      "[Screening] Evaluation failed schema validation:",
+      z.prettifyError(parsed.error),
+    );
+    throw new ScreeningError(
+      502,
+      "Invalid evaluation structure returned by AI",
+      { code: "invalid_evaluation", details: z.prettifyError(parsed.error) },
+    );
+  }
+
+  return { ...parsed.data, ...computeEvaluationScores(parsed.data) };
+}
+
 export interface EvaluationRequestResult {
   evaluation: Evaluation;
   verification?: VerificationMetadata;
@@ -275,24 +377,7 @@ export async function requestEvaluation(
     throw new ScreeningError(500, "Empty response from AI");
   }
 
-  const jsonMatch = contentText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new ScreeningError(500, "Could not parse evaluation response");
-  }
-
-  const evaluation: Evaluation = JSON.parse(jsonMatch[0]);
-
-  if (
-    evaluation.overallPass === undefined ||
-    evaluation.qualityScore === undefined ||
-    evaluation.attentionScore === undefined
-  ) {
-    throw new ScreeningError(
-      500,
-      "Invalid evaluation structure returned by AI",
-    );
-  }
-
+  const evaluation = parseEvaluation(contentText);
   evaluation.model = config.model;
 
   let verification: VerificationMetadata | undefined;
@@ -323,6 +408,14 @@ export function respondWithScreeningError(
   error: unknown,
   fallbackMessage?: string,
 ) {
+  // Stable shape the UI keys on; never overridden by fallbackMessage.
+  if (error instanceof NotAuthorizedError) {
+    return res.status(error.statusCode).json({
+      error: error.code,
+      message: error.message,
+    });
+  }
+
   if (error instanceof ScreeningError) {
     const detailMessage =
       fallbackMessage ??

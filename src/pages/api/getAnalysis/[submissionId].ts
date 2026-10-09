@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getScreeningResult } from "@/lib/db/queries";
+import { assertAccountAllowed } from "@/server/accessControl";
 import {
   verifyNearAuth,
   respondWithScreeningError,
@@ -41,6 +42,13 @@ export default async function handler(
   }
 
   const nearAddress = verificationResult.accountId;
+
+  // Internal-preview allowlist: reject before touching the DB.
+  try {
+    assertAccountAllowed(nearAddress);
+  } catch (error) {
+    return respondWithScreeningError(res, error);
+  }
 
   try {
     const row = await getScreeningResult(submissionId);
