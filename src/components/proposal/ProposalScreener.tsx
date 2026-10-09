@@ -8,6 +8,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VerificationProof } from "@/components/verification/VerificationProof";
 import { useNear } from "@/hooks/useNear";
 import type { VerificationMetadata } from "@/types/agui-events";
+import { NOT_AUTHORIZED_ERROR, type ApiErrorResponse } from "@/types/api";
 import type { Evaluation, EvaluationCriterion } from "@/types/evaluation";
 import {
   AlertCircle,
@@ -24,6 +33,7 @@ import {
   Copy,
   Eye,
   Loader2,
+  Lock,
   Shield,
   TrendingUp,
   Wand2,
@@ -80,6 +90,15 @@ export const ProposalScreener = () => {
   const [model, setModel] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [submittedCharCount, setSubmittedCharCount] = useState<number | null>(null);
+  // Account the server rejected as not on the allowlist. The allowlist is only
+  // ever checked server-side; this just remembers the 403 so the UI can show
+  // the unauthorized state. Keyed on the account so switching wallets clears it.
+  const [notAuthorizedAccount, setNotAuthorizedAccount] = useState<
+    string | null
+  >(null);
+  const notAuthorized =
+    !!signedAccountId && notAuthorizedAccount === signedAccountId;
+  const [accessDialogOpen, setAccessDialogOpen] = useState<boolean>(false);
 
   const evaluateProposal = async () => {
     if (!title.trim()) {
@@ -120,14 +139,21 @@ export const ProposalScreener = () => {
       });
 
       if (!response.ok) {
-        let errorMessage: string | undefined;
+        let errorData: Partial<ApiErrorResponse> = {};
         try {
-          const errorData: { error?: string; message?: string } =
-            await response.json();
-          errorMessage = errorData.message || errorData.error;
+          errorData = await response.json();
         } catch {
           // ignore JSON errors
         }
+        if (
+          response.status === 403 &&
+          errorData.error === NOT_AUTHORIZED_ERROR
+        ) {
+          setNotAuthorizedAccount(signedAccountId);
+          setAccessDialogOpen(true);
+          return;
+        }
+        const errorMessage = errorData.message || errorData.error;
         throw new Error(
           errorMessage || `API request failed: ${response.status}`,
         );
@@ -234,10 +260,43 @@ export const ProposalScreener = () => {
   };
 
   const connectDisabled = walletLoading;
-  const screenDisabled = loading || walletLoading || !signedAccountId;
+  const screenDisabled =
+    loading || walletLoading || !signedAccountId || notAuthorized;
 
   return (
     <div className="min-h-screen bg-background">
+      <Dialog
+        open={notAuthorized && accessDialogOpen}
+        onOpenChange={setAccessDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md p-8">
+          <DialogHeader className="items-center text-center sm:text-center gap-3">
+            <div className="rounded-full bg-destructive/10 p-4">
+              <Lock className="h-8 w-8 text-destructive" />
+            </div>
+            <DialogTitle className="text-2xl">Access restricted</DialogTitle>
+            <DialogDescription className="text-base">
+              Your wallet is not on the internal allowlist for this preview.
+              Contact the team to request access.
+            </DialogDescription>
+            {signedAccountId && (
+              <code className="rounded bg-muted px-2 py-1 text-xs break-all">
+                {signedAccountId}
+              </code>
+            )}
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button
+              type="button"
+              className="w-full sm:w-auto sm:min-w-32"
+              onClick={() => setAccessDialogOpen(false)}
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-4xl mx-auto p-8">
         <Card>
           <CardHeader className="text-center space-y-2">
@@ -283,7 +342,7 @@ export const ProposalScreener = () => {
                 />
               </div>
 
-              {error && (
+              {error && !notAuthorized && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
@@ -320,6 +379,11 @@ export const ProposalScreener = () => {
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Evaluating proposal...
+                    </>
+                  ) : notAuthorized ? (
+                    <>
+                      <Lock className="h-4 w-4" />
+                      Access restricted
                     </>
                   ) : (
                     <>

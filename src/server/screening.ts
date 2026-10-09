@@ -1,4 +1,5 @@
 import { buildScreeningPrompt } from "@/lib/prompts/screenProposal";
+import { NotAuthorizedError } from "@/server/accessControl";
 import type { VerificationMetadata } from "@/types/agui-events";
 import type { Evaluation } from "@/types/evaluation";
 import {
@@ -407,6 +408,14 @@ export function respondWithScreeningError(
   error: unknown,
   fallbackMessage?: string,
 ) {
+  // Stable shape the UI keys on; never overridden by fallbackMessage.
+  if (error instanceof NotAuthorizedError) {
+    return res.status(error.statusCode).json({
+      error: error.code,
+      message: error.message,
+    });
+  }
+
   if (error instanceof ScreeningError) {
     const detailMessage =
       fallbackMessage ??
