@@ -353,7 +353,7 @@ export const ProposalScreener = () => {
                     <div className="flex-1 space-y-2">
                       <div className="font-semibold text-lg">
                         {result.overallPass
-                          ? "Ready for Submission"
+                          ? "Ready to Submit for Review"
                           : "Needs Improvement"}
                       </div>
                       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
@@ -472,9 +472,11 @@ export const ProposalScreener = () => {
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                     <AlertDescription className="text-green-900">
-                      <strong>AI Screened & Approved</strong>
+                      <strong>Passed AI Pre-Screening</strong>
                       <br />
-                      This proposal has passed all automated quality criteria
+                      This draft meets all automated quality criteria. Final
+                      review and approval rest with the HSP Editor and the
+                      Screening Committee.
                     </AlertDescription>
                   </Alert>
                 )}
