@@ -81,6 +81,8 @@ The dev server runs at <http://localhost:3000>. The two pages are `/` (the scree
 
 Both `/api/screen` and `/api/getAnalysis/[submissionId]` are gated by NEP-413 wallet authentication. Saved analyses are readable only by the original submitting wallet; other accounts receive a 404 for that `submissionId`.
 
+During the internal preview, access is further restricted to an allowlist of NEAR accounts set via `NEAR_ACCESS_ALLOWLIST` (comma-separated, e.g. `alice.near,bob.near`; entries are trimmed and matched lowercase). After the NEP-413 signature is verified, and before rate limiting, any AI call, or any DB read, accounts not on the list receive `403 { "error": "not_authorized" }` and the UI shows a dedicated "not on the allowlist" message. If the variable is unset or empty, production fails closed (no account is allowed) and logs a warning at startup; in development (`NODE_ENV !== "production"`) all accounts are allowed with a console warning. The check lives in `src/server/accessControl.ts` and runs only on the server, against the `accountId` recovered from the verified signature — the client never sends or decides its own access status; it only renders the server's 403.
+
 ## Pages
 
 | Route                          | Description                                                                                            |
@@ -133,6 +135,7 @@ The v1 internal preview runs on **Railway** with Railway Postgres. Required prod
 - `NEAR_AI_CLOUD_API_KEY` when `SCREENING_MODEL_PROVIDER` is unset or `nearai`
 - `MINIMAX_API_KEY` when `SCREENING_MODEL_PROVIDER=minimax`
 - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- `NEAR_ACCESS_ALLOWLIST` — comma-separated NEAR accounts allowed to use the preview (unset = nobody in production)
 
 Optional:
 

@@ -5,6 +5,7 @@ import {
   requestEvaluation,
   respondWithScreeningError,
 } from "@/server/screening";
+import { assertAccountAllowed } from "@/server/accessControl";
 import { createRateLimiter } from "@/server/rateLimiter";
 import { rateLimitConfig } from "@/config/rateLimit";
 import { saveScreeningResult } from "@/lib/db/queries";
@@ -41,6 +42,13 @@ export default async function handler(
   }
 
   const nearAddress = verificationResult.accountId;
+
+  // Internal-preview allowlist: reject before rate limiting or any AI/DB work.
+  try {
+    assertAccountAllowed(nearAddress);
+  } catch (error) {
+    return respondWithScreeningError(res, error);
+  }
 
   // Apply rate limit per NEAR account
   const { allowed, remaining, resetTime } = screenLimiter.check(nearAddress);
