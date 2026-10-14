@@ -42,7 +42,7 @@ export class ScreeningError extends Error {
 export const MIN_TITLE_LENGTH = 12;
 export const MAX_TITLE_LENGTH = 255;
 export const MIN_CONTENT_LENGTH = 12;
-export const MAX_CONTENT_LENGTH = 32000;
+export const MAX_CONTENT_LENGTH = 65000;
 const PROMPT_CONTENT_LIMIT = MAX_CONTENT_LENGTH;
 
 const CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/g;
