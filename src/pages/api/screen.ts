@@ -4,13 +4,21 @@ import {
   verifyNearAuth,
   requestEvaluation,
   respondWithScreeningError,
+  screeningErrorPayload,
 } from "@/server/screening";
 import { assertAccountAllowed } from "@/server/accessControl";
 import { createRateLimiter } from "@/server/rateLimiter";
 import { rateLimitConfig } from "@/config/rateLimit";
 import { saveScreeningResult } from "@/lib/db/queries";
+import {
+  SCREEN_STREAM_CONTENT_TYPE,
+  type ScreenStreamEvent,
+} from "@/utils/screeningStream";
 
 const screenLimiter = createRateLimiter(rateLimitConfig.screen);
+
+/** How often a keep-alive event is sent while the AI is evaluating. */
+export const HEARTBEAT_INTERVAL_MS = 15_000;
 
 /**
  * POST /api/screen
@@ -19,6 +27,13 @@ const screenLimiter = createRateLimiter(rateLimitConfig.screen);
  * result. Requires a NEAR wallet signature (NEP-413). Returns the evaluation
  * along with a server-generated `submissionId` the client can use to retrieve
  * the stored analysis later via GET /api/getAnalysis/[submissionId].
+ *
+ * Auth, allowlist, rate-limit and input errors are plain JSON with their
+ * status codes. Once those pass, the response switches to an NDJSON stream
+ * (see src/utils/screeningStream.ts): 200 headers immediately, a keep-alive
+ * event every 15 s, then one `result` or `error` event. Without steady bytes,
+ * Railway's edge proxy cuts multi-minute evaluations with a 502 even though
+ * the server finishes and saves the result.
  */
 
 export default async function handler(
@@ -84,6 +99,28 @@ export default async function handler(
     return respondWithScreeningError(res, error);
   }
 
+  res.writeHead(200, {
+    "Content-Type": `${SCREEN_STREAM_CONTENT_TYPE}; charset=utf-8`,
+    // no-transform keeps Next's gzip middleware from buffering the stream.
+    "Cache-Control": "no-cache, no-transform",
+    "X-Accel-Buffering": "no",
+  });
+
+  const send = (event: ScreenStreamEvent) => {
+    if (res.writableEnded || res.destroyed) return;
+    res.write(`${JSON.stringify(event)}\n`);
+    (res as unknown as { flush?: () => void }).flush?.();
+  };
+
+  send({ type: "progress", stage: "evaluating" });
+  const heartbeat = setInterval(
+    () => send({ type: "ping" }),
+    HEARTBEAT_INTERVAL_MS
+  );
+  // If the client goes away, stop pinging; the evaluation still finishes and
+  // is saved, so it isn't lost.
+  res.on("close", () => clearInterval(heartbeat));
+
   try {
     const { evaluation, verification, verificationId, model } =
       await requestEvaluation(sanitizedTitle, sanitizedProposal);
@@ -113,15 +150,25 @@ export default async function handler(
       ).toFixed(0)}%, submissionId: ${submissionId ?? "(unsaved)"}`
     );
 
-    return res.status(200).json({
-      submissionId,
-      evaluation,
-      authenticatedAs: nearAddress,
-      verification,
-      verificationId,
-      model,
+    send({
+      type: "result",
+      data: {
+        submissionId,
+        evaluation,
+        authenticatedAs: nearAddress,
+        verification,
+        verificationId,
+        model,
+      },
     });
   } catch (error) {
-    return respondWithScreeningError(res, error, "Failed to evaluate proposal");
+    const { status, body } = screeningErrorPayload(
+      error,
+      "Failed to evaluate proposal"
+    );
+    send({ type: "error", status, error: body.error, message: body.message });
+  } finally {
+    clearInterval(heartbeat);
+    res.end();
   }
 }

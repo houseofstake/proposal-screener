@@ -589,17 +589,26 @@ export async function requestEvaluation(
   };
 }
 
-export function respondWithScreeningError(
-  res: NextApiResponse,
+export interface ScreeningErrorBody {
+  error: string;
+  message: string;
+  details?: unknown;
+}
+
+/**
+ * Status code + JSON body for an error, shared by plain JSON responses and the
+ * streamed /api/screen error event so both carry the same shape.
+ */
+export function screeningErrorPayload(
   error: unknown,
   fallbackMessage?: string,
-) {
+): { status: number; body: ScreeningErrorBody } {
   // Stable shape the UI keys on; never overridden by fallbackMessage.
   if (error instanceof NotAuthorizedError) {
-    return res.status(error.statusCode).json({
-      error: error.code,
-      message: error.message,
-    });
+    return {
+      status: error.statusCode,
+      body: { error: error.code, message: error.message },
+    };
   }
 
   if (error instanceof ScreeningError) {
@@ -610,17 +619,32 @@ export function respondWithScreeningError(
         .filter((value): value is string => typeof value === "string")
         .find((value) => value.length > 0) ??
       error.message;
-    return res.status(error.statusCode).json({
-      error: error.message,
-      message: detailMessage,
-      details:
-        process.env.NODE_ENV === "development" ? error.details : undefined,
-    });
+    return {
+      status: error.statusCode,
+      body: {
+        error: error.message,
+        message: detailMessage,
+        details:
+          process.env.NODE_ENV === "development" ? error.details : undefined,
+      },
+    };
   }
 
   console.error("[Screening] Unexpected error:", error);
-  return res.status(500).json({
-    error: "Failed to evaluate proposal",
-    message: fallbackMessage || "An unexpected error occurred",
-  });
+  return {
+    status: 500,
+    body: {
+      error: "Failed to evaluate proposal",
+      message: fallbackMessage || "An unexpected error occurred",
+    },
+  };
+}
+
+export function respondWithScreeningError(
+  res: NextApiResponse,
+  error: unknown,
+  fallbackMessage?: string,
+) {
+  const { status, body } = screeningErrorPayload(error, fallbackMessage);
+  return res.status(status).json(body);
 }

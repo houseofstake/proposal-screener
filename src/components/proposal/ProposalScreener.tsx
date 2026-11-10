@@ -25,6 +25,7 @@ import { useNear } from "@/hooks/useNear";
 import type { VerificationMetadata } from "@/types/agui-events";
 import { NOT_AUTHORIZED_ERROR, type ApiErrorResponse } from "@/types/api";
 import type { Evaluation, EvaluationCriterion } from "@/types/evaluation";
+import { readScreenStream } from "@/utils/screeningStream";
 import {
   AlertCircle,
   AlertTriangle,
@@ -159,13 +160,9 @@ export const ProposalScreener = () => {
         );
       }
 
-      const data: {
-        submissionId?: string;
-        evaluation: Evaluation;
-        verification?: VerificationMetadata | null;
-        verificationId?: string | null;
-        model?: string | null;
-      } = await response.json();
+      // The evaluation phase is streamed (NDJSON) so the connection stays
+      // alive through multi-minute evaluations; see utils/screeningStream.ts.
+      const data = await readScreenStream(response);
 
       setResult(data.evaluation);
       setSubmissionId(data.submissionId ?? null);

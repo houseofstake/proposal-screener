@@ -101,17 +101,21 @@ During the internal preview, access is further restricted to an allowlist of NEA
 | `POST` | `/api/verification/register-session`| -                   | Register a verification session.                              |
 | `GET`  | `/api/verification/session`         | -                   | Fetch a verification session.                                 |
 
-`POST /api/screen` returns:
+`POST /api/screen` answers auth, allowlist, rate-limit and input errors as plain JSON with their status codes. Once those checks pass it responds `200` with an NDJSON stream (`Content-Type: application/x-ndjson`, see `src/utils/screeningStream.ts`), because an evaluation can take several minutes and proxies such as Railway's edge cut silent connections with a 502:
 
 ```jsonc
-{
+{"type":"progress","stage":"evaluating"}   // sent immediately
+{"type":"ping"}                            // every 15 s while the AI works
+{"type":"result","data":{
   "submissionId": "uuid",
   "evaluation": { /* Evaluation object — see src/types/evaluation.ts */ },
   "authenticatedAs": "alice.near",
   "verification": { /* TEE attestation metadata, if available */ },
   "verificationId": "msg-id",
   "model": "openai/gpt-oss-120b"
-}
+}}
+// …or, if the evaluation fails:
+{"type":"error","status":504,"error":"MiniMax timed out","message":"…"}
 ```
 
 The corresponding result URL is `${NEXT_PUBLIC_SITE_URL}/screening/<submissionId>`.
