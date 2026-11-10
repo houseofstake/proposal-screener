@@ -21,6 +21,8 @@ type ScreeningErrorDetails = {
   body?: string;
   status?: number;
   statusText?: string;
+  /** Safe to show the user; takes precedence over an endpoint's fallback message. */
+  publicMessage?: string;
   [key: string]: unknown;
 };
 
@@ -215,7 +217,13 @@ export function computeEvaluationScores(
  * evaluation schema, and fills in server-computed scores.
  */
 export function parseEvaluation(contentText: string): Evaluation {
-  const jsonMatch = contentText.match(/\{[\s\S]*\}/);
+  // Reasoning models (e.g. MiniMax) may inline their thinking before the answer
+  // as <think>…</think>; braces inside it would break the JSON extraction.
+  const thinkEnd = contentText.lastIndexOf("</think>");
+  const answer =
+    thinkEnd === -1 ? contentText : contentText.slice(thinkEnd + 8);
+
+  const jsonMatch = answer.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new ScreeningError(502, "Could not parse evaluation response");
   }
@@ -263,6 +271,13 @@ type ScreeningProviderConfig = {
   baseUrl: string;
   model: string;
   supportsVerification: boolean;
+  /**
+   * Request a streamed (SSE) response. Headers arrive immediately, so a long
+   * generation can't trip Node fetch's 5-minute headers timeout. NEAR AI stays
+   * non-streaming because its verification metadata is read from the full
+   * response body.
+   */
+  stream: boolean;
 };
 
 const DEFAULT_SCREENING_PROVIDER: ScreeningModelProvider = "nearai";
@@ -305,6 +320,7 @@ function getScreeningProviderConfig(
       ),
       model: process.env.MINIMAX_MODEL ?? "MiniMax-M2.7",
       supportsVerification: false,
+      stream: true,
     };
   }
 
@@ -318,7 +334,147 @@ function getScreeningProviderConfig(
     ),
     model: process.env.NEAR_AI_MODEL ?? "openai/gpt-oss-120b",
     supportsVerification: true,
+    stream: false,
   };
+}
+
+const DEFAULT_SCREENING_TIMEOUT_MS = 10 * 60 * 1000;
+
+function getScreeningTimeoutMs(): number {
+  const parsed = Number(process.env.SCREENING_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_SCREENING_TIMEOUT_MS;
+}
+
+const UNDICI_TIMEOUT_CODES = new Set([
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UND_ERR_BODY_TIMEOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * Maps low-level fetch failures (our overall timeout, undici's built-in
+ * timeouts, network errors) to ScreeningErrors with a user-facing message.
+ */
+function toProviderFetchError(
+  error: unknown,
+  label: string,
+  elapsedMs: number,
+): ScreeningError {
+  if (error instanceof ScreeningError) return error;
+
+  const name = error instanceof Error ? error.name : "";
+  const cause = error instanceof Error ? error.cause : undefined;
+  const causeCode =
+    cause && typeof cause === "object" && "code" in cause
+      ? String((cause as { code: unknown }).code)
+      : undefined;
+  const elapsed = `${(elapsedMs / 1000).toFixed(1)}s`;
+
+  console.error(
+    `[Screening] ${label} request failed after ${elapsed}:`,
+    error,
+  );
+
+  if (
+    name === "TimeoutError" ||
+    name === "AbortError" ||
+    (causeCode !== undefined && UNDICI_TIMEOUT_CODES.has(causeCode))
+  ) {
+    return new ScreeningError(504, `${label} timed out`, {
+      code: "provider_timeout",
+      details: causeCode ?? name,
+      publicMessage: `${label} took too long to evaluate the proposal (${elapsed}). Please try again, or shorten the proposal.`,
+    });
+  }
+
+  return new ScreeningError(502, `Could not reach ${label}`, {
+    code: "provider_unreachable",
+    details: causeCode ?? (error instanceof Error ? error.message : undefined),
+    publicMessage: `Could not reach ${label} to evaluate the proposal. Please try again.`,
+  });
+}
+
+type StreamChunk = {
+  choices?: {
+    delta?: { content?: unknown };
+    finish_reason?: string | null;
+  }[];
+  error?: { message?: string };
+  base_resp?: { status_code?: number; status_msg?: string };
+};
+
+/**
+ * Reads an OpenAI-compatible SSE stream and returns the concatenated answer
+ * content. Reasoning deltas (e.g. `reasoning_content`) are ignored.
+ */
+async function readStreamedContent(
+  response: Response,
+  label: string,
+): Promise<string> {
+  if (!response.body) {
+    throw new ScreeningError(502, `Empty response from ${label}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let finishReason: string | null = null;
+
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) return;
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") return;
+
+    let chunk: StreamChunk;
+    try {
+      chunk = JSON.parse(payload);
+    } catch {
+      return; // keep-alive or partial noise
+    }
+
+    // Errors can arrive mid-stream with a 200 status (MiniMax reports them in
+    // base_resp; OpenAI-style providers in `error`).
+    const providerError =
+      chunk.error?.message ??
+      (chunk.base_resp?.status_code ? chunk.base_resp.status_msg ?? "" : null);
+    if (providerError !== null) {
+      throw new ScreeningError(502, `${label} API error`, {
+        code: "provider_error",
+        status: chunk.base_resp?.status_code,
+        body: providerError,
+      });
+    }
+
+    const choice = chunk.choices?.[0];
+    if (typeof choice?.delta?.content === "string") {
+      content += choice.delta.content;
+    }
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
+  };
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    lines.forEach(handleLine);
+  }
+  buffer += decoder.decode();
+  if (buffer) handleLine(buffer);
+
+  if (finishReason === "length") {
+    throw new ScreeningError(502, `${label} response was cut off`, {
+      code: "truncated_response",
+      publicMessage: `${label}'s evaluation was cut off before it finished. Please try again, or shorten the proposal.`,
+    });
+  }
+
+  return content;
 }
 
 export async function requestEvaluation(
@@ -334,46 +490,76 @@ export async function requestEvaluation(
   }
 
   const prompt = buildScreeningPrompt(title, content);
+  const startedAt = Date.now();
 
-  const response = await fetch(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-    }),
-  });
+  // Covers the whole exchange, including reading a streamed body. Note that
+  // non-streaming requests still hit undici's 5-minute headers timeout first.
+  const signal = AbortSignal.timeout(getScreeningTimeoutMs());
 
-  if (!response.ok) {
-    const errorText = await response
-      .text()
-      .catch(() => "Failed to read error body");
-    console.error(
-      `[Screening] ${config.label} API error:`,
-      response.status,
-      response.statusText,
-      errorText,
-    );
-    const statusCategory =
-      response.status === 504
-        ? `${config.label} timed out while evaluating the proposal. Please try again or shorten the content.`
-        : `${config.label} API error`;
-
-    throw new ScreeningError(502, statusCategory, {
-      status: response.status,
-      statusText: response.statusText,
-      body: errorText,
+  let data: Record<string, any> = {};
+  let contentText: unknown;
+  try {
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        ...(config.stream ? { stream: true } : {}),
+      }),
+      signal,
     });
+
+    if (!response.ok) {
+      const errorText = await response
+        .text()
+        .catch(() => "Failed to read error body");
+      console.error(
+        `[Screening] ${config.label} API error:`,
+        response.status,
+        response.statusText,
+        errorText,
+      );
+      const isTimeout = response.status === 504;
+
+      throw new ScreeningError(
+        isTimeout ? 504 : 502,
+        isTimeout ? `${config.label} timed out` : `${config.label} API error`,
+        {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          publicMessage: isTimeout
+            ? `${config.label} timed out while evaluating the proposal. Please try again or shorten the content.`
+            : undefined,
+        },
+      );
+    }
+
+    if (config.stream) {
+      contentText = await readStreamedContent(response, config.label);
+    } else {
+      data = await response.json();
+      contentText = data.choices?.[0]?.message?.content;
+    }
+  } catch (error) {
+    throw toProviderFetchError(error, config.label, Date.now() - startedAt);
   }
 
-  const data = await response.json();
-  const contentText = data.choices?.[0]?.message?.content;
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[Screening] ${config.label} responded in ${(
+        (Date.now() - startedAt) /
+        1000
+      ).toFixed(1)}s`,
+    );
+  }
 
-  if (!contentText) {
+  if (typeof contentText !== "string" || !contentText) {
     throw new ScreeningError(500, "Empty response from AI");
   }
 
@@ -418,6 +604,7 @@ export function respondWithScreeningError(
 
   if (error instanceof ScreeningError) {
     const detailMessage =
+      error.details?.publicMessage ??
       fallbackMessage ??
       [error.details?.details, error.details?.message, error.details?.body]
         .filter((value): value is string => typeof value === "string")

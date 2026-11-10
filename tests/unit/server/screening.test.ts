@@ -1,9 +1,11 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildScreeningPrompt } from "@/lib/prompts/screenProposal";
 import {
   parseEvaluation,
   requestEvaluation,
   resolveScreeningModelProvider,
+  respondWithScreeningError,
   ScreeningError,
 } from "@/server/screening";
 
@@ -24,6 +26,35 @@ const evaluation = {
 };
 
 const originalEnv = { ...process.env };
+
+/** OpenAI-compatible SSE body, split into deliberately uneven network chunks. */
+function sseResponse(events: unknown[], chunkSize = 7): Response {
+  const text =
+    events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("") +
+    "data: [DONE]\n\n";
+  const bytes = new TextEncoder().encode(text);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        controller.enqueue(bytes.slice(i, i + chunkSize));
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    status: 200,
+    headers: { "Content-Type": "text/event-stream" },
+  });
+}
+
+function contentDeltas(text: string, pieces = 5) {
+  const size = Math.ceil(text.length / pieces);
+  const deltas = [];
+  for (let i = 0; i < text.length; i += size) {
+    deltas.push({ choices: [{ delta: { content: text.slice(i, i + size) } }] });
+  }
+  return deltas;
+}
 
 function mockProviderResponse(id: string) {
   vi.mocked(global.fetch).mockResolvedValue({
@@ -84,7 +115,13 @@ describe("screening provider selection", () => {
     process.env.SCREENING_MODEL_PROVIDER = "minimax";
     process.env.MINIMAX_API_KEY = "minimax-key";
     process.env.MINIMAX_MODEL = "MiniMax-custom";
-    mockProviderResponse("minimax-message-id");
+    vi.mocked(global.fetch).mockResolvedValue(
+      sseResponse([
+        { id: "minimax-message-id", choices: [{ delta: { reasoning_content: "thinking {x}" } }] },
+        ...contentDeltas(JSON.stringify(evaluation)),
+        { choices: [{ delta: {}, finish_reason: "stop" }] },
+      ]),
+    );
 
     const result = await requestEvaluation("Title", "Proposal");
     const [url, init] = vi.mocked(global.fetch).mock.calls[0];
@@ -95,6 +132,8 @@ describe("screening provider selection", () => {
       Authorization: "Bearer minimax-key",
     });
     expect(body.model).toBe("MiniMax-custom");
+    expect(body.stream).toBe(true);
+    expect(result.evaluation.summary).toBe("Ready");
     expect(result.model).toBe("MiniMax-custom");
     expect(result.verification).toBeUndefined();
     expect(result.verificationId).toBeUndefined();
@@ -176,5 +215,118 @@ describe("buildScreeningPrompt", () => {
         .trimEnd()
         .endsWith("no additional text before or after the JSON."),
     ).toBe(true);
+  });
+});
+
+describe("provider failures", () => {
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    process.env.SCREENING_MODEL_PROVIDER = "minimax";
+    process.env.MINIMAX_API_KEY = "minimax-key";
+    global.fetch = vi.fn();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
+  });
+
+  async function captureError(promise: Promise<unknown>) {
+    try {
+      await promise;
+    } catch (error) {
+      return error as ScreeningError;
+    }
+    throw new Error("expected rejection");
+  }
+
+  it("maps undici's headers timeout to a 504 with a user-facing message", async () => {
+    vi.mocked(global.fetch).mockRejectedValue(
+      new TypeError("fetch failed", {
+        cause: Object.assign(new Error("Headers Timeout Error"), {
+          code: "UND_ERR_HEADERS_TIMEOUT",
+        }),
+      }),
+    );
+
+    const error = await captureError(requestEvaluation("Title", "Proposal"));
+    expect(error).toBeInstanceOf(ScreeningError);
+    expect(error.statusCode).toBe(504);
+    expect(error.details?.publicMessage).toMatch(/took too long/);
+  });
+
+  it("maps the overall abort timeout to a 504", async () => {
+    vi.mocked(global.fetch).mockRejectedValue(
+      new DOMException("The operation was aborted due to timeout", "TimeoutError"),
+    );
+
+    const error = await captureError(requestEvaluation("Title", "Proposal"));
+    expect(error.statusCode).toBe(504);
+  });
+
+  it("maps other network failures to a 502", async () => {
+    vi.mocked(global.fetch).mockRejectedValue(new TypeError("fetch failed"));
+
+    const error = await captureError(requestEvaluation("Title", "Proposal"));
+    expect(error.statusCode).toBe(502);
+    expect(error.details?.code).toBe("provider_unreachable");
+  });
+
+  it("surfaces an error reported mid-stream", async () => {
+    vi.mocked(global.fetch).mockResolvedValue(
+      sseResponse([{ base_resp: { status_code: 1008, status_msg: "insufficient balance" } }]),
+    );
+
+    const error = await captureError(requestEvaluation("Title", "Proposal"));
+    expect(error.statusCode).toBe(502);
+    expect(error.details?.body).toBe("insufficient balance");
+  });
+
+  it("rejects a stream cut off by the token limit", async () => {
+    vi.mocked(global.fetch).mockResolvedValue(
+      sseResponse([
+        ...contentDeltas(JSON.stringify(evaluation).slice(0, 40)),
+        { choices: [{ delta: {}, finish_reason: "length" }] },
+      ]),
+    );
+
+    const error = await captureError(requestEvaluation("Title", "Proposal"));
+    expect(error.details?.code).toBe("truncated_response");
+  });
+
+  it("shows the public message instead of the endpoint fallback", () => {
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+    respondWithScreeningError(
+      res as never,
+      new ScreeningError(504, "MiniMax timed out", {
+        publicMessage: "MiniMax took too long",
+      }),
+      "Failed to evaluate proposal",
+    );
+
+    expect(res.status).toHaveBeenCalledWith(504);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "MiniMax took too long" }),
+    );
+  });
+});
+
+describe("parseEvaluation with reasoning output", () => {
+  it("ignores an inline <think> block, even one containing braces", () => {
+    const result = parseEvaluation(
+      `<think>Draft: { "complete": maybe }</think>\n${JSON.stringify(evaluation)}`,
+    );
+    expect(result.summary).toBe("Ready");
+  });
+
+  it("handles output that only has the closing think tag", () => {
+    const result = parseEvaluation(
+      `reasoning with {braces}</think>${JSON.stringify(evaluation)}`,
+    );
+    expect(result.overallPass).toBe(true);
   });
 });
